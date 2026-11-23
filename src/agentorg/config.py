@@ -103,6 +103,10 @@ def load_project(root: Path) -> dict:
             raise OrgError(f"Role {rid} has unsupported mode")
         if role.get("enabled", True) not in (True, False):
             raise OrgError(f"Role {rid} enabled must be bool")
+        for opt in ("title", "focus"):
+            val = role.get(opt)
+            if val is not None and (not isinstance(val, str) or any(c in val for c in '"%&|<>^') or any(ord(c) < 32 for c in val)):
+                raise OrgError(f"Role {rid} {opt} must be a string without any of \" % & | < > ^ or control characters")
         for opt in ("model", "effort"):
             if opt in role and (not isinstance(role[opt], str) or not role[opt].strip()):
                 raise OrgError(f"Role {rid} optional {opt} must be a nonempty string")

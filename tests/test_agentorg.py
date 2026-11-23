@@ -61,7 +61,7 @@ class TempOrgTest(unittest.TestCase):
         with patch("agentorg.cli.which", return_value="/mock/claude"), contextlib.redirect_stdout(io.StringIO()):
             cli.main(["profile", "add", "reviewer", "--provider", "claude", "--config-dir", str(local_cfg), "--model", "opus"])
         profile_text = config.profiles_path().read_text(encoding="utf-8")
-        self.assertIn(str(local_cfg), profile_text)
+        self.assertEqual(json.loads(profile_text)["profiles"]["reviewer"]["config_dir"], str(local_cfg.resolve()))
         self.assertNotIn("ANTHROPIC_API_KEY", profile_text)
         self.assertNotIn("reviewer", (self.project / ".ai" / "TEAM.json").read_text()[:120])
         if os.name != "nt":
@@ -181,13 +181,98 @@ class TempOrgTest(unittest.TestCase):
             seen["cmd"], seen["env"] = argv, env
             raise RuntimeError("capture")
 
+        def fake_run(argv, env=None, **kw):
+            return fake_exec(None, argv, env)
+
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "not-for-this-profile", "CLAUDE_CONFIG_DIR": "/wrong"}), \
+             patch("agentorg.runtime.which", return_value="/mock/claude"), \
+             patch("agentorg.runtime.subprocess.run", side_effect=fake_run), \
              patch("agentorg.runtime.os.execvpe", side_effect=fake_exec):
             with self.assertRaisesRegex(RuntimeError, "capture"):
                 runtime.launch_agent_process(self.project, "technical-reviewer")
         self.assertNotIn("ANTHROPIC_API_KEY", seen["env"])
         self.assertEqual(seen["env"]["CLAUDE_CONFIG_DIR"], str(local_cfg))
         self.assertIn("--effort", seen["cmd"])
+        self.assertEqual(seen["cmd"][0], "/mock/claude")
+
+    def test_launch_resolves_executable_via_which(self):
+        self.init()
+        config.save_profiles({"implementer": {"provider": "codex", "command": "codex"}})
+        seen = {}
+
+        def capture(argv, **kw):
+            seen["cmd"] = argv
+            raise RuntimeError("capture")
+
+        with patch("agentorg.runtime.which", return_value="C:/npm/codex.cmd"), \
+             patch("agentorg.runtime.subprocess.run", side_effect=capture), \
+             patch("agentorg.runtime.os.execvpe", side_effect=lambda b, a, e: capture(a)):
+            with self.assertRaisesRegex(RuntimeError, "capture"):
+                runtime.launch_agent_process(self.project, "backend-worker")
+        self.assertEqual(seen["cmd"][0], "C:/npm/codex.cmd")
+
+    def test_unsafe_title_or_focus_rejected(self):
+        self.init()
+        p = config.project_file(self.project)
+        for key, bad in (("focus", 'x" & calc & "'), ("title", "a|b"), ("focus", "line\nbreak"), ("focus", 5)):
+            doc = json.loads(p.read_text(encoding="utf-8"))
+            doc["roles"][0][key] = bad
+            config.write_json(p, doc)
+            with self.assertRaises(config.OrgError):
+                config.load_project(self.project)
+
+    def test_shipped_templates_and_example_validate(self):
+        for name in ("engineering", "research", "content"):
+            path = self.root / ("t-" + name)
+            path.mkdir()
+            with contextlib.redirect_stdout(io.StringIO()):
+                cli.main(["init", "--path", str(path), "--template", name])
+            config.load_project(path)
+        example = Path(__file__).resolve().parent.parent / "examples" / "layerdelta"
+        if example.is_dir():
+            config.load_project(example)
+
+    def test_status_reports_per_role_error_and_reconcile_keeps_fields(self):
+        from types import SimpleNamespace
+        self.init()
+        (self.project / ".ai" / "RUNTIME.json").write_text(json.dumps(
+            {"schema_version": 2, "terminals": {"backend-worker": {"name": "old", "cwd": "/c", "status": "launched"}}}), encoding="utf-8")
+
+        def fake_existing(name, labels=None):
+            if "backend" in name:
+                raise config.OrgError("boom")
+            return None
+
+        out = io.StringIO()
+        with patch("agentorg.cli.hc_ready"), patch("agentorg.cli.existing_terminal", side_effect=fake_existing), \
+             patch("agentorg.cli.role_labels", return_value={}), contextlib.redirect_stdout(out):
+            cli.team_cmd(SimpleNamespace(path=str(self.project), op="reconcile"))
+        rows = {r["role"]: r for r in json.loads(out.getvalue())["status"]}
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(rows["backend-worker"]["error"], "boom")
+        self.assertFalse(rows["backend-worker"]["live"])
+        saved = json.loads((self.project / ".ai" / "RUNTIME.json").read_text(encoding="utf-8"))["terminals"]
+        self.assertEqual(saved["backend-worker"]["cwd"], "/c")
+        self.assertEqual(saved["backend-worker"]["status"], "launched")
+        self.assertIs(saved["backend-worker"]["live"], False)
+
+    def test_escalation_codes_in_skills_and_prompt(self):
+        source = cli.skill_sources()
+        mgr = source.joinpath("agent-org-manager", "SKILL.md").read_text(encoding="utf-8")
+        eng = source.joinpath("agent-org-engineering", "SKILL.md").read_text(encoding="utf-8")
+        self.init()
+        doc = config.load_project(self.project)
+        prompt = runtime.make_agent_prompt(self.project, config.resolve_role(doc, "technical-reviewer"))
+        for code in runtime.ESCALATION_CODES:
+            self.assertIn(code, mgr)
+            self.assertIn(code, eng)
+            self.assertIn(code, prompt)
+
+    def test_hc_json_not_found_error_is_not_found(self):
+        payload = json.dumps({"error": {"hint": "hc ls", "kind": "not_found", "message": 'no terminal "x"'}})
+        response = subprocess.CompletedProcess(["hc"], 3, stdout=payload, stderr="")
+        with patch("agentorg.runtime.run_process", return_value=response):
+            self.assertIsNone(runtime.existing_terminal("x"))
 
     def test_skill_package_contents(self):
         source = cli.skill_sources()

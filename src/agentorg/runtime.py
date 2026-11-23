@@ -11,6 +11,10 @@ from pathlib import Path
 from .config import OrgError, read_json, write_json, org_home, load_project, load_profiles, resolve_profile, resolve_role
 
 
+ESCALATION_CODES = ("milestone_ready", "blocked", "requires_owner_decision", "scope_change",
+                    "safety_or_cost_risk", "review_exhausted")
+
+
 def run_process(argv, *, cwd=None, timeout=25, env=None):
     try:
         return subprocess.run(argv, cwd=str(cwd) if cwd else None, env=env, text=True,
@@ -100,6 +104,12 @@ def existing_terminal(name: str, expected_labels: dict | None = None):
     result = run_process(["hc", "get", name, "--json"], timeout=15)
     if result.returncode != 0:
         error = (result.stderr + " " + result.stdout).lower()
+        try:
+            kind = json.loads(result.stdout).get("error", {}).get("kind")
+        except (ValueError, AttributeError):
+            kind = None
+        if kind == "not_found":
+            return None
         if any(phrase in error for phrase in ("not found", "no terminal", "unknown terminal")):
             return None
         raise OrgError(f"Cannot inspect Herdr terminal '{name}': {error.strip()}. Refusing to start a duplicate.")
@@ -181,13 +191,8 @@ def start_team(project: Path, *, apply: bool = False):
         if not role.get("enabled", True):
             continue
         cwd = project
-        worktree = None
         if doc["kind"] == "software" and role["mode"] == "worker" and doc.get("policies", {}).get("isolate_worker_worktrees", True):
-            worktree, branch = worktree_info(project, role)
-            if apply:
-                cwd = ensure_worktree(project, role)
-            else:
-                cwd = worktree
+            cwd = ensure_worktree(project, role) if apply else worktree_info(project, role)[0]
         cmd = role_launch_cmd(project, role, cwd)
         name = terminal_name(project, role["id"])
         item = {"role": role["id"], "terminal": name, "cwd": str(cwd), "command": cmd, "action": "preview"}
@@ -225,7 +230,8 @@ def make_agent_prompt(project: Path, role: dict) -> str:
         route = (f"You are the review-loop owner for {details or 'assigned workers'}. "
                  "Receive code/PR/test evidence from workers, review it independently and send fixes "
                  "directly back using hc send. Do not wake PM for normal review rounds. "
-                 "Notify PM only for milestone_ready, blocker, decision, significant risk, or review exhaustion; "
+                 f"Stop patch churn and require RCA after {doc.get('policies', {}).get('review_rounds_before_rca', 3)} unproductive review/fix rounds. "
+                 f"Notify PM only with one of: {', '.join(ESCALATION_CODES)}; "
                  "if PM is not reachable, persist a concise checkpoint for later pickup. ")
     return (f"You are {role.get('title', role['id'])} (role {role['id']}) in project {doc['project_id']}. "
             f"Focus: {role.get('focus', '')}. Read `hc --skill` and the project's .ai/PROJECT.md, "
@@ -271,6 +277,8 @@ def launch_agent_process(project: Path, role_id: str):
     if effort:
         cmd.extend(["--effort", effort] if provider == "claude" else ["-c", f"model_reasoning_effort={effort}"])
     cmd.append(make_agent_prompt(project, role))
+    # Resolve npm .cmd shims (Windows) that bare CreateProcess cannot find.
+    cmd[0] = which(cmd[0]) or cmd[0]
     # No shell and no token arguments. Provider CLIs inherit the terminal TTY.
     if os.name != "nt":
         os.execvpe(cmd[0], cmd, env)

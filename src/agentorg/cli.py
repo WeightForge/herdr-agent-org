@@ -6,13 +6,12 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
 from . import __version__
 from .config import (OrgError, load_profiles, save_profiles, profiles_path, validate_id,
-                     load_project, write_json, template_document, resolve_role, project_file)
+                     load_project, write_json, read_json, template_document, resolve_role, project_file)
 from .runtime import (start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
                       existing_terminal, run_process, validate_binaries, which)
 
@@ -261,12 +260,16 @@ def team_cmd(ns):
         if not role.get("enabled", True):
             continue
         name = terminal_name(root, role["id"])
-        active = existing_terminal(name, role_labels(root, role))
-        status.append({"role": role["id"], "terminal": name, "live": active is not None,
-                       "details": active if active is not None else None})
+        try:
+            active = existing_terminal(name, role_labels(root, role))
+            status.append({"role": role["id"], "terminal": name, "live": active is not None,
+                           "details": active if active is not None else None})
+        except OrgError as exc:
+            status.append({"role": role["id"], "terminal": name, "live": False, "details": None, "error": str(exc)})
     if ns.op == "reconcile":
-        from .config import write_json
-        runtime = {"schema_version": 2, "terminals": {s["role"]: {"name": s["terminal"], "live": s["live"]} for s in status}}
+        runtime = read_json(root / ".ai" / "RUNTIME.json", default={"schema_version": 2, "terminals": {}})
+        for s in status:
+            runtime.setdefault("terminals", {}).setdefault(s["role"], {}).update({"name": s["terminal"], "live": s["live"]})
         write_json(root / ".ai" / "RUNTIME.json", runtime)
     print(json.dumps({"project": doc["project_id"], "status": status}, indent=2))
 
