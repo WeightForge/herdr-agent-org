@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -161,13 +162,24 @@ def role_labels(project: Path, role: dict) -> dict:
             "profile": role["profile"], "cfg": fingerprint}
 
 
+def pm_terminal(value=None):
+    """PM's Herdr terminal id: the caller's HC_TERMINAL_ID if it looks safe, else None."""
+    value = os.environ.get("HC_TERMINAL_ID") if value is None else value
+    return value if value and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value) else None
+
+
 def role_launch_cmd(project: Path, role: dict, cwd: Path) -> list[str]:
     name = terminal_name(project, role["id"])
     labels = role_labels(project, role)
     command = ["hc", "run", "--bg", "--name", name, "--cwd", str(cwd), "--outlive-parent"]
+    # A paired worker is a child of its reviewer, so worker notes reach the reviewer, not the PM.
+    if role.get("mode") == "worker" and role.get("reviewer_role"):
+        command.extend(["--parent", terminal_name(project, role["reviewer_role"])])
     for key, value in labels.items():
         command.extend(["--label", f"{key}={value}"])
-    return command + [sys.executable, "-m", "agentorg", "_launch", "--project", str(project), "--role", role["id"], "--profile-store", str(org_home())]
+    command += [sys.executable, "-m", "agentorg", "_launch", "--project", str(project), "--role", role["id"], "--profile-store", str(org_home())]
+    pm = pm_terminal()
+    return command + ["--pm", pm] if pm else command
 
 
 def start_team(project: Path, *, apply: bool = False):
@@ -187,9 +199,11 @@ def start_team(project: Path, *, apply: bool = False):
         hc_ready()
     result = []
     runtime = read_json(project / ".ai" / "RUNTIME.json", default={"schema_version": 2, "terminals": {}})
-    for role in doc["roles"]:
-        if not role.get("enabled", True):
-            continue
+    if apply and pm_terminal():
+        runtime["pm_terminal"] = pm_terminal()
+    # Reviewers first (stable otherwise): they must exist before their workers name them as parent.
+    ordered = sorted((r for r in doc["roles"] if r.get("enabled", True)), key=lambda r: r["mode"] != "reviewer")
+    for role in ordered:
         cwd = project
         if doc["kind"] == "software" and role["mode"] == "worker" and doc.get("policies", {}).get("isolate_worker_worktrees", True):
             cwd = ensure_worktree(project, role) if apply else worktree_info(project, role)[0]
@@ -213,7 +227,7 @@ def start_team(project: Path, *, apply: bool = False):
     return result
 
 
-def make_agent_prompt(project: Path, role: dict) -> str:
+def make_agent_prompt(project: Path, role: dict, pm: str | None = None) -> str:
     """Generate the first provider prompt with direct worker/reviewer coordination."""
     doc = load_project(project)
     reviewer_id = role.get("reviewer_role") if role.get("mode") == "worker" else None
@@ -231,8 +245,10 @@ def make_agent_prompt(project: Path, role: dict) -> str:
                  "Receive code/PR/test evidence from workers, review it independently and send fixes "
                  "directly back using hc send. Do not wake PM for normal review rounds. "
                  f"Stop patch churn and require RCA after {doc.get('policies', {}).get('review_rounds_before_rca', 3)} unproductive review/fix rounds. "
-                 f"Notify PM only with one of: {', '.join(ESCALATION_CODES)}; "
-                 "if PM is not reachable, persist a concise checkpoint for later pickup. ")
+                 f"Notes about your workers (turn ended, blocked, exited) arrive here because you are their Herdr parent; handle them yourself. "
+                 + (f"Escalate to PM with `hc send {pm} ...` using one of: {', '.join(ESCALATION_CODES)}. " if pm else
+                    f"PM is outside Herdr; write the escalation (one of: {', '.join(ESCALATION_CODES)}) to .ai/STATE.md (and the PR) for the next PM activation. ")
+                 + "If PM is not reachable, persist a concise checkpoint for later pickup. ")
     return (f"You are {role.get('title', role['id'])} (role {role['id']}) in project {doc['project_id']}. "
             f"Focus: {role.get('focus', '')}. Read `hc --skill` and the project's .ai/PROJECT.md, "
             ".ai/TEAM.json, .ai/ROADMAP.md, and .ai/STATE.md, if available. "
@@ -244,7 +260,7 @@ def make_agent_prompt(project: Path, role: dict) -> str:
             "For now, read project context and wait for task assignment; don't modify project files proactively.")
 
 
-def launch_agent_process(project: Path, role_id: str):
+def launch_agent_process(project: Path, role_id: str, pm: str | None = None):
     doc = load_project(project)
     role = resolve_role(doc, role_id)
     profile = resolve_profile(role, load_profiles())
@@ -276,7 +292,7 @@ def launch_agent_process(project: Path, role_id: str):
         cmd.extend(["--model", model] if provider == "claude" else ["-m", model])
     if effort:
         cmd.extend(["--effort", effort] if provider == "claude" else ["-c", f"model_reasoning_effort={effort}"])
-    cmd.append(make_agent_prompt(project, role))
+    cmd.append(make_agent_prompt(project, role, pm_terminal(pm or "") if pm else None))
     # Resolve npm .cmd shims (Windows) that bare CreateProcess cannot find.
     cmd[0] = which(cmd[0]) or cmd[0]
     # No shell and no token arguments. Provider CLIs inherit the terminal TTY.

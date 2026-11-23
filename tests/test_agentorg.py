@@ -231,6 +231,43 @@ class TempOrgTest(unittest.TestCase):
             cli.role_cmd(ns)
         self.assertEqual(p.read_bytes(), before)
 
+    def test_worker_parent_is_reviewer_and_reviewers_launch_first(self):
+        self.init()
+        self.make_profiles()
+        self.git_commit()
+        with patch("agentorg.runtime.which", return_value="/mock/bin"), patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("HC_TERMINAL_ID", None)
+            items = runtime.start_team(self.project, apply=False)
+        modes = ["reviewer", "reviewer", "worker", "worker"]
+        doc = config.load_project(self.project)
+        self.assertEqual([config.resolve_role(doc, x["role"])["mode"] for x in items], modes)
+        by_role = {x["role"]: x["command"] for x in items}
+        rev = runtime.terminal_name(self.project, "technical-reviewer")
+        cmd = by_role["backend-worker"]
+        self.assertEqual(cmd[cmd.index("--parent") + 1], rev)
+        self.assertNotIn("--parent", by_role["technical-reviewer"])
+        self.assertNotIn("--pm", cmd)
+
+    def test_pm_terminal_threaded_into_launch_and_prompt(self):
+        self.init()
+        self.make_profiles()
+        doc = config.load_project(self.project)
+        reviewer = config.resolve_role(doc, "technical-reviewer")
+        before = runtime.role_labels(self.project, reviewer)
+        with patch.dict(os.environ, {"HC_TERMINAL_ID": "t7"}):
+            cmd = runtime.role_launch_cmd(self.project, reviewer, self.project)
+            labels = runtime.role_labels(self.project, reviewer)
+        self.assertEqual(cmd[cmd.index("--pm") + 1], "t7")
+        self.assertEqual(labels, before)
+        self.assertIn("hc send t7", runtime.make_agent_prompt(self.project, reviewer, "t7"))
+        self.assertIn("PM is outside Herdr", runtime.make_agent_prompt(self.project, reviewer))
+        with patch.dict(os.environ, {"HC_TERMINAL_ID": "bad id&x"}):
+            self.assertNotIn("--pm", runtime.role_launch_cmd(self.project, reviewer, self.project))
+
+    def test_manager_skill_has_no_children_wait(self):
+        mgr = cli.skill_sources().joinpath("agent-org-manager", "SKILL.md").read_text(encoding="utf-8")
+        self.assertNotIn("--children any", mgr)
+
     def test_shipped_templates_and_example_validate(self):
         for name in ("engineering", "research", "content"):
             path = self.root / ("t-" + name)

@@ -41,7 +41,7 @@ Recommended next action: <...>   Human approval needed: yes|no
 
 PM → Owner: concise status when a milestone is ready or explicit human decision is needed. Use `QUESTION.md` for nonurgent bundled questions, with options and recommendation.
 
-Use `hc send`, `hc get`, `hc read`, `hc wait` as shown in **current `hc --skill`**. Do not repeatedly poll or send “status?” messages; `hc wait --children any` can wait for important events when supported, but it is not a self-running scheduler. If PM is outside Herdr (for example Antigravity IDE), `hc send` messages may not push into that IDE session. Ensure reviewer writes a durable report to `.ai/STATE.md`/PR/decision log and check on the next PM activation, or use a separately approved watcher.
+Use `hc send`, `hc get`, `hc read` as shown in **current `hc --skill`**. Dispatch tasks with `agentorg team send <role> "..."` **without** `--wait`, then end your turn. You are woken only by a reviewer escalation (one of the six codes above) or by hc's note that a reviewer blocked, errored or exited (workers are children of their reviewers, so their notes do not reach you). Do not poll, send “status?” messages or wait on children. If PM is outside Herdr (for example Antigravity IDE), `hc send` messages may not push into that IDE session. Ensure reviewer writes a durable report to `.ai/STATE.md`/PR/decision log and check on the next PM activation, or use a separately approved watcher.
 
 ## Research and content loops
 

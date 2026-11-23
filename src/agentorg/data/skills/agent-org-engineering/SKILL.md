@@ -31,6 +31,8 @@ One write owner per worktree. Workers may run tasks in parallel only if interfac
 
 ## Reviewer-owned feedback and QA loop
 
+The reviewer is the Herdr parent of its paired workers, so hc notes about them (turn ended, blocked, exited) arrive at the reviewer, who handles them and escalates to the PM address in its launch prompt.
+
 1. Independently review the actual diff, tests, security, regressions, specifications and user experience; use relevant specialized skill when available. Validate reported tests/CI instead of trusting claims.
 2. Send actionable findings **directly to Worker** with severity, location, expected correction and reproduction. Own the feedback/retest workflow rather than asking PM to relay comments.
 3. At the RCA threshold of unproductive review/fix rounds (`policies.review_rounds_before_rca` in `.ai/TEAM.json`, default 3), stop patch churn; require root-cause analysis, minimal reproduction and regression test. Reviewer may take over implementation only exceptionally, after recording ownership change and arranging a second independent verifier.

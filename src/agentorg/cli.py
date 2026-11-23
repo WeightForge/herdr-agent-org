@@ -79,6 +79,7 @@ def add_parser() -> argparse.ArgumentParser:
     q.add_argument("--project", required=True)
     q.add_argument("--role", required=True)
     q.add_argument("--profile-store", required=True, help=argparse.SUPPRESS)
+    q.add_argument("--pm", help=argparse.SUPPRESS)
     return p
 
 
@@ -297,7 +298,7 @@ def main(argv=None):
             install_skills(ns)
         elif ns.command == "_launch":
             os.environ["AGENTORG_HOME"] = str(rootpath(ns.profile_store))
-            sys.exit(launch_agent_process(rootpath(ns.project), ns.role))
+            sys.exit(launch_agent_process(rootpath(ns.project), ns.role, ns.pm))
     except OrgError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(2)
