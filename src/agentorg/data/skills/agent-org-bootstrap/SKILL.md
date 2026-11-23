@@ -1,6 +1,6 @@
 ---
 name: agent-org-bootstrap
-description: Initialize an AI organization for any existing software, research or content project, select team roles and configure local provider profiles via agentorg CLI and Herdr. Use when a user says start a new AI team, initialize a PM, or make a repository autonomous.
+description: Initialize an AI organization for an existing software, research or content project: select team roles and configure local provider profiles (requires the agentorg CLI and Herdr `hc`). Use when a user says to start a new AI team, set up a PM and roles for a repository, or run `agentorg init`.
 ---
 
 # Agent Organization — Bootstrap
