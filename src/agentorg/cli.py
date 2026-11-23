@@ -6,13 +6,12 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
 from . import __version__
 from .config import (OrgError, load_profiles, save_profiles, profiles_path, validate_id,
-                     load_project, write_json, template_document, resolve_role, project_file)
+                     load_project, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
 from .runtime import (start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
                       existing_terminal, run_process, validate_binaries, which)
 
@@ -80,6 +79,7 @@ def add_parser() -> argparse.ArgumentParser:
     q.add_argument("--project", required=True)
     q.add_argument("--role", required=True)
     q.add_argument("--profile-store", required=True, help=argparse.SUPPRESS)
+    q.add_argument("--pm", help=argparse.SUPPRESS)
     return p
 
 
@@ -137,6 +137,9 @@ def profile_cmd(ns):
         raise OrgError(f"Profile '{ns.name}' exists; use --replace to update it")
     if ns.native_profile and ns.provider != "codex":
         raise OrgError("--native-profile is supported for Codex only")
+    for opt in ("model", "effort", "native_profile"):
+        if getattr(ns, opt):
+            check_safe_text(getattr(ns, opt), "--" + opt.replace("_", "-"))
     config_dir = None
     if ns.config_dir:
         path = Path(ns.config_dir).expanduser().resolve()
@@ -161,6 +164,9 @@ def role_cmd(ns):
         print(json.dumps(doc["roles"], indent=2))
         return
     role = resolve_role(doc, ns.role)
+    for opt in ("model", "effort"):
+        if getattr(ns, opt):
+            check_safe_text(getattr(ns, opt), f"--{opt}")
     if ns.profile:
         validate_id(ns.profile, "profile alias")
         role["profile"] = ns.profile
@@ -261,12 +267,16 @@ def team_cmd(ns):
         if not role.get("enabled", True):
             continue
         name = terminal_name(root, role["id"])
-        active = existing_terminal(name, role_labels(root, role))
-        status.append({"role": role["id"], "terminal": name, "live": active is not None,
-                       "details": active if active is not None else None})
+        try:
+            active = existing_terminal(name, role_labels(root, role))
+            status.append({"role": role["id"], "terminal": name, "live": active is not None,
+                           "details": active if active is not None else None})
+        except OrgError as exc:
+            status.append({"role": role["id"], "terminal": name, "live": False, "details": None, "error": str(exc)})
     if ns.op == "reconcile":
-        from .config import write_json
-        runtime = {"schema_version": 2, "terminals": {s["role"]: {"name": s["terminal"], "live": s["live"]} for s in status}}
+        runtime = read_json(root / ".ai" / "RUNTIME.json", default={"schema_version": 2, "terminals": {}})
+        for s in status:
+            runtime.setdefault("terminals", {}).setdefault(s["role"], {}).update({"name": s["terminal"], "live": s["live"]})
         write_json(root / ".ai" / "RUNTIME.json", runtime)
     print(json.dumps({"project": doc["project_id"], "status": status}, indent=2))
 
@@ -288,7 +298,7 @@ def main(argv=None):
             install_skills(ns)
         elif ns.command == "_launch":
             os.environ["AGENTORG_HOME"] = str(rootpath(ns.profile_store))
-            sys.exit(launch_agent_process(rootpath(ns.project), ns.role))
+            sys.exit(launch_agent_process(rootpath(ns.project), ns.role, ns.pm))
     except OrgError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(2)

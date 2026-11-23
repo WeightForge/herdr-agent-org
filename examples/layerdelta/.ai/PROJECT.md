@@ -8,3 +8,6 @@ Broad framework/operator coverage; extensible model IR; inspectable graph and ch
 
 ## Non-goals and approvals
 Pilot postponed to pre-release. No publication/release/deploy/merge without explicit owner approval. Example only; inspect actual repo and update these assumptions before use.
+
+## Domain review checklist
+For model-weight manipulation also check reproducibility, operator coverage, shape safety, provenance, controlled side effects, reversibility and benchmarks.

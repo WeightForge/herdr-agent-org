@@ -53,13 +53,12 @@ For macOS/Linux replace `py` with `python3` and use shell paths. For a Codex acc
 ## What gets installed
 
 ```text
-skills/
+src/agentorg/data/skills/
   agent-org-manager/SKILL.md        # project management + team policy
   agent-org-engineering/SKILL.md    # software-specific SDLC/PR/review gates
   agent-org-bootstrap/SKILL.md      # first setup, profiles, manifests
   agent-org-recovery/SKILL.md       # checkpoint + crash/limit recovery
-
-templates/                         # engineering, research, content
+src/agentorg/data/*.json           # engineering, research, content templates
 src/agentorg/                      # dependency-free Python CLI
 examples/layerdelta/               # an illustrative, nonsecret team manifest
 ```
@@ -113,7 +112,7 @@ License: Apache-2.0. Not affiliated with the Herdr, Anthropic or OpenAI teams.
 
 ## v2.1 — Coordinator-first PM (Worker > Reviewer > PM)
 
-The PM only plans milestones, assigns task owners/reviewers, resolves blockers/decisions and receives **reviewer-verified milestone reports**. Workers implement/test and notify their paired reviewer directly; reviewers own feedback, QA and correction cycles. PM must not poll frequently or relay ordinary review comments. This is a **skill policy and initial agent prompt**, not a background watcher or guaranteed always-on scheduler.
+The PM only plans milestones, assigns task owners/reviewers, resolves blockers/decisions and receives **reviewer-verified milestone reports**. Workers implement/test and notify their paired reviewer directly; reviewers own feedback, QA and correction cycles. PM must not poll frequently or relay ordinary review comments. Runtime topology: `team up --apply` launches reviewers first as children of the PM, and each paired worker with `--parent <its reviewer terminal>`, so worker notes from Herdr reach the reviewer and only reviewer escalations reach the PM (PM -> reviewers -> workers). The launching terminal's `HC_TERMINAL_ID` is passed to reviewers as the PM address. Beyond that this is a **skill policy and initial agent prompt**, not a background watcher or guaranteed always-on scheduler.
 
 The engineering template includes `reviewer_role` on worker roles, e.g. `backend-worker → technical-reviewer`. On new work, explicitly pair the worker with the reviewer. Users may override or remove the optional routing field, but a configured reviewer must exist and be enabled.
 

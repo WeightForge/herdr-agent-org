@@ -75,6 +75,12 @@ def validate_id(value: str, label: str):
         raise OrgError(f"Invalid {label} '{value}'. Use lowercase a-z, digits, - or _; start with a letter; max 40 chars.")
 
 
+def check_safe_text(value, label: str):
+    """Reject text that cmd.exe would interpret when it reaches a .cmd shim argv."""
+    if not isinstance(value, str) or any(c in value for c in '"%&|<>^') or any(ord(c) < 32 for c in value):
+        raise OrgError(f"{label} must be a string without any of \" % & | < > ^ or control characters")
+
+
 def project_file(root: Path) -> Path:
     return root / ".ai" / "TEAM.json"
 
@@ -103,8 +109,11 @@ def load_project(root: Path) -> dict:
             raise OrgError(f"Role {rid} has unsupported mode")
         if role.get("enabled", True) not in (True, False):
             raise OrgError(f"Role {rid} enabled must be bool")
+        for opt in ("title", "focus", "model", "effort"):
+            if opt in role:
+                check_safe_text(role[opt], f"Role {rid} {opt}")
         for opt in ("model", "effort"):
-            if opt in role and (not isinstance(role[opt], str) or not role[opt].strip()):
+            if opt in role and not role[opt].strip():
                 raise OrgError(f"Role {rid} optional {opt} must be a nonempty string")
     # Review routing is optional for backwards compatibility. If supplied, fail fast
     # when a worker points to an invalid or disabled reviewer.

@@ -19,6 +19,10 @@ PM (Claude Code or Codex + agent-org-manager skill)
    └── Herdr agent processes (native Claude/Codex CLI)
 ```
 
+## Herdr parent tree
+
+`team up --apply` starts reviewer roles first as children of the PM terminal, then each worker with `--parent <reviewer terminal>`. Herdr types worker notes (turn ended, blocked, exited) into the reviewer, so PM -> reviewers -> workers and the PM is woken only by reviewer escalations. The PM's `HC_TERMINAL_ID` (if valid) is passed to launched roles as `--pm` and recorded as `pm_terminal` in `.ai/RUNTIME.json`; it is deliberately not part of the role label fingerprint.
+
 ## Boundaries
 
 - **Config**: source-controlled `.ai/TEAM.json` stores only role IDs, profile aliases and requirements; local `AGENTORG_HOME/profiles.json` maps aliases to CLI binaries, models and config directories. No OAuth/access tokens stored by `agentorg`.

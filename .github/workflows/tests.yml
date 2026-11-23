@@ -21,3 +21,13 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Check CLI
         run: agentorg --help
+      - name: Build and smoke-test wheel
+        shell: bash
+        run: |
+          python -m pip wheel . --no-deps -w dist
+          python -m venv "$RUNNER_TEMP/whl"
+          VBIN="$RUNNER_TEMP/whl/bin"; [ -d "$VBIN" ] || VBIN="$RUNNER_TEMP/whl/Scripts"
+          "$VBIN/python" -m pip install --force-reinstall dist/*.whl
+          export CLAUDE_CONFIG_DIR="$RUNNER_TEMP/claude-cfg"
+          "$VBIN/agentorg" install --target claude
+          test -f "$CLAUDE_CONFIG_DIR/skills/agent-org-manager/SKILL.md"

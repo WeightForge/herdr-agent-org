@@ -1,6 +1,6 @@
 ---
 name: agent-org-engineering
-description: Reviewer-led multi-agent software engineering loop using Herdr and Git worktrees. Workers implement and test, reviewers coordinate feedback and independent verification, and a lightweight PM receives only milestone-ready results or escalations.
+description: Reviewer-led multi-agent software engineering loop using Herdr and Git worktrees (requires the agentorg CLI and Herdr `hc`). Workers implement and test, reviewers coordinate feedback and verification, and the PM receives only milestone-ready results or escalations. Use when a PM, worker or reviewer role in an agentorg software team is assigned or reviewing a task.
 ---
 
 # Engineering loop — Worker heavy, Reviewer next, PM light
@@ -9,7 +9,17 @@ Use existing repository build/test/security/contribution instructions as source 
 
 ## Task packet (from PM to Worker, copied to Reviewer)
 
-Task ID; objective; scope and owned worktree/branch; target acceptance criteria; dependent contracts; expected tests; reviewer role and terminal target; exit conditions; permission gates. One write owner per worktree. Workers may run tasks in parallel only if interfaces and files do not conflict.
+```text
+TASK <id>
+Objective: <one sentence>
+Scope / worktree+branch: <owned files, branch>
+Acceptance criteria: <measurable>
+Expected tests: <commands>
+Reviewer: <role> (terminal <name>)
+Exit conditions / permission gates: <...>
+```
+
+One write owner per worktree. Workers may run tasks in parallel only if interfaces and files do not conflict.
 
 ## Worker-owned implementation loop
 
@@ -21,15 +31,25 @@ Task ID; objective; scope and owned worktree/branch; target acceptance criteria;
 
 ## Reviewer-owned feedback and QA loop
 
+The reviewer is the Herdr parent of its paired workers, so hc notes about them (turn ended, blocked, exited) arrive at the reviewer, who handles them and escalates to the PM address in its launch prompt.
+
 1. Independently review the actual diff, tests, security, regressions, specifications and user experience; use relevant specialized skill when available. Validate reported tests/CI instead of trusting claims.
 2. Send actionable findings **directly to Worker** with severity, location, expected correction and reproduction. Own the feedback/retest workflow rather than asking PM to relay comments.
-3. At 3 unproductive review/fix rounds, stop patch churn; require root-cause analysis, minimal reproduction and regression test. Reviewer may take over implementation only exceptionally, after recording ownership change and arranging a second independent verifier.
-4. Once validation passes and required gates are satisfied, send PM **one concise milestone-ready report** including task ID, PR, acceptance evidence, unresolved limitations, decisions required, and recommended next task. A review-ready PR is not permission to merge.
-5. Escalate to PM immediately only for an unresolvable blocker, conflicting scope/contract, security or cost risk, change of ownership, or decision requiring the human.
+3. At the RCA threshold of unproductive review/fix rounds (`policies.review_rounds_before_rca` in `.ai/TEAM.json`, default 3), stop patch churn; require root-cause analysis, minimal reproduction and regression test. Reviewer may take over implementation only exceptionally, after recording ownership change and arranging a second independent verifier.
+4. Once validation passes and required gates are satisfied, send PM **one concise report** with code `milestone_ready`. A review-ready PR is not permission to merge.
+
+```text
+ESCALATION: milestone_ready
+Task: <id>   PR: <link>
+Acceptance evidence: <tests/CI results>
+Limitations / decisions needed: <...>
+Recommended next task: <...>
+```
+5. Escalate to PM immediately only with `blocked`, `scope_change`, `safety_or_cost_risk`, `requires_owner_decision` or `review_exhausted` (same format, different code).
 
 ## Engineering quality gate
 
-Measurable acceptance criteria, real test evidence (including honest failures), CI and review, backward compatibility where applicable, no outstanding high severity issue, documentation matching code, independent final verification where reviewer also edited code. For model-weight manipulation also check reproducibility, operator coverage, shape safety, provenance, controlled side effects, reversibility and benchmarks.
+Measurable acceptance criteria, real test evidence (including honest failures), CI and review, backward compatibility where applicable, no outstanding high severity issue, documentation matching code, independent final verification where reviewer also edited code.
 
 ## Event-driven and state safety
 
