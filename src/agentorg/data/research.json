@@ -9,10 +9,7 @@
   },
   "policies": {
     "max_parallel_workers": 2,
-    "default_mode": "dry_run",
-    "isolate_worker_worktrees": false,
-    "pm_mode": "coordinator",
-    "reporting": "worker_to_reviewer_to_pm"
+    "isolate_worker_worktrees": false
   },
   "roles": [
     {
@@ -29,7 +26,8 @@
       "mode": "worker",
       "profile": "implementer",
       "focus": "Literature, experiments, reproducibility, analysis",
-      "enabled": true
+      "enabled": true,
+      "reviewer_role": "principal-investigator"
     }
   ]
 }

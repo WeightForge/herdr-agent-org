@@ -11,10 +11,7 @@
   "policies": {
     "max_parallel_workers": 2,
     "review_rounds_before_rca": 3,
-    "default_mode": "dry_run",
-    "isolate_worker_worktrees": true,
-    "pm_mode": "coordinator",
-    "reporting": "worker_to_reviewer_to_pm"
+    "isolate_worker_worktrees": true
   },
   "roles": [
     {

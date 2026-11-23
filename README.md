@@ -53,13 +53,12 @@ For macOS/Linux replace `py` with `python3` and use shell paths. For a Codex acc
 ## What gets installed
 
 ```text
-skills/
+src/agentorg/data/skills/
   agent-org-manager/SKILL.md        # project management + team policy
   agent-org-engineering/SKILL.md    # software-specific SDLC/PR/review gates
   agent-org-bootstrap/SKILL.md      # first setup, profiles, manifests
   agent-org-recovery/SKILL.md       # checkpoint + crash/limit recovery
-
-templates/                         # engineering, research, content
+src/agentorg/data/*.json           # engineering, research, content templates
 src/agentorg/                      # dependency-free Python CLI
 examples/layerdelta/               # an illustrative, nonsecret team manifest
 ```
