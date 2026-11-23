@@ -214,12 +214,22 @@ class TempOrgTest(unittest.TestCase):
     def test_unsafe_title_or_focus_rejected(self):
         self.init()
         p = config.project_file(self.project)
-        for key, bad in (("focus", 'x" & calc & "'), ("title", "a|b"), ("focus", "line\nbreak"), ("focus", 5)):
+        for key, bad in (("focus", 'x" & calc & "'), ("title", "a|b"), ("focus", "line\nbreak"), ("focus", 5),
+                         ("model", "opus&hostname"), ("effort", "x&ver")):
             doc = json.loads(p.read_text(encoding="utf-8"))
             doc["roles"][0][key] = bad
             config.write_json(p, doc)
             with self.assertRaises(config.OrgError):
                 config.load_project(self.project)
+
+    def test_role_set_unsafe_model_rejected_and_manifest_unchanged(self):
+        self.init()
+        p = config.project_file(self.project)
+        before = p.read_bytes()
+        ns = cli.add_parser().parse_args(["role", "set", "backend-worker", "--path", str(self.project), "--model", "a&b"])
+        with self.assertRaises(config.OrgError):
+            cli.role_cmd(ns)
+        self.assertEqual(p.read_bytes(), before)
 
     def test_shipped_templates_and_example_validate(self):
         for name in ("engineering", "research", "content"):

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import __version__
 from .config import (OrgError, load_profiles, save_profiles, profiles_path, validate_id,
-                     load_project, write_json, read_json, template_document, resolve_role, project_file)
+                     load_project, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
 from .runtime import (start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
                       existing_terminal, run_process, validate_binaries, which)
 
@@ -136,6 +136,9 @@ def profile_cmd(ns):
         raise OrgError(f"Profile '{ns.name}' exists; use --replace to update it")
     if ns.native_profile and ns.provider != "codex":
         raise OrgError("--native-profile is supported for Codex only")
+    for opt in ("model", "effort", "native_profile"):
+        if getattr(ns, opt):
+            check_safe_text(getattr(ns, opt), "--" + opt.replace("_", "-"))
     config_dir = None
     if ns.config_dir:
         path = Path(ns.config_dir).expanduser().resolve()
@@ -160,6 +163,9 @@ def role_cmd(ns):
         print(json.dumps(doc["roles"], indent=2))
         return
     role = resolve_role(doc, ns.role)
+    for opt in ("model", "effort"):
+        if getattr(ns, opt):
+            check_safe_text(getattr(ns, opt), f"--{opt}")
     if ns.profile:
         validate_id(ns.profile, "profile alias")
         role["profile"] = ns.profile
