@@ -1,3 +1,11 @@
+## 0.4.0 — robust handoffs
+- Codex roles launch with `--no-daemon` (hc containment) and get label `nodaemon=1`; older live Codex terminals are refused for reuse until stopped deliberately.
+- `team status` reports `blocked: [{role, terminal, kind}]` without prompt text.
+- Task files `.ai/tasks/<id>/{packet.md,progress.md}` (single writer each), `blocked_by` dependencies, file-first worker handoff `.ai/handoff/<task>.md`, inbox ids with a 4-hex suffix and a "Handled escalations" list in `STATE.md`.
+- `team down` reports `disabled` roles (and still stops a live, label-matching disabled terminal).
+- `team smoke` checks a codex-provider fake receives `--no-daemon` and `status.blocked == []`.
+- Docs: exact-target permission rules for unattended operation; four new skill evals.
+
 ## 0.3.0 — smoke, down, inbox, evals
 - `team smoke [--keep]`: live end-to-end check with fake agents (no model tokens); cleans up after itself.
 - `team down [--apply] [--remove-worktrees]`: label-checked stop (workers first), worktrees removed without `--force`.

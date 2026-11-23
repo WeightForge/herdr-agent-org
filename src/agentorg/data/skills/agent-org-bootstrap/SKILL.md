@@ -15,7 +15,9 @@ description: Initialize an AI organization for an existing software, research or
 
 ## Unattended operation
 
-Agents message each other with `hc`, and every provider asks the human before running a command it has not been allowed to run. Pre-allow only the `hc` commands agents use, in each provider's own settings; do not use dangerous skip-permission flags. Claude Code example (`settings.json`): `"permissions": {"allow": ["Bash(hc send:*)", "Bash(hc read:*)", "Bash(hc get:*)", "Bash(hc ls:*)"]}`. For Codex and Antigravity configure their equivalent allowlist or approval mode. Providers with folder trust (Antigravity) need the `.agentorg-worktrees` folder trusted. Never allow `hc keys`; agents must not answer each other's prompts.
+Agents message each other with `hc`, and every provider asks the human before running a command it has not been allowed to run. Pre-allow only the `hc` commands agents use, in each provider's own settings; do not use dangerous skip-permission flags. Claude Code example (`settings.json`), exact targets where the version supports mid-pattern wildcards (terminal names are `ao-<project>-<role>-<hash>`): `"permissions": {"allow": ["Bash(hc send ao-myproj-*)", "Bash(hc read:*)", "Bash(hc get:*)", "Bash(hc ls:*)"]}`. A prefix rule (`:*`) matches any trailing arguments, so it may also allow flags such as `--force`; where a provider cannot express the restriction, keep interactive approval for that command. Folder trust stays a per-worktree human decision (for example Antigravity for `.agentorg-worktrees`). Never allow `hc keys`; agents must not answer each other's prompts.
+
+Task files: `agentorg init` does not create `.ai/tasks/`; the PM creates `.ai/tasks/<id>/` per task. It is versioned project state: do not add it to `.gitignore` (only `RUNTIME.json` and `inbox/` are ignored).
 
 ## Universal separation
 

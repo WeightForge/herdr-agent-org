@@ -159,14 +159,35 @@ def role_labels(project: Path, role: dict) -> dict:
     profile = resolve_profile(role, load_profiles())
     stable_config = json.dumps({"role": role, "profile": profile}, sort_keys=True)
     fingerprint = hashlib.sha256(stable_config.encode("utf-8")).hexdigest()[:10]
-    return {"agentorg": load_project(project)["project_id"], "role": role["id"],
-            "profile": role["profile"], "cfg": fingerprint}
+    labels = {"agentorg": load_project(project)["project_id"], "role": role["id"],
+              "profile": role["profile"], "cfg": fingerprint}
+    if profile["provider"] == "codex":
+        labels["nodaemon"] = "1"  # a pre-0.4 codex terminal lacks it, so reuse is refused (it ran outside hc)
+    return labels
 
 
 def pm_terminal(value=None):
     """PM's Herdr terminal id: the caller's HC_TERMINAL_ID if it looks safe, else None."""
     value = os.environ.get("HC_TERMINAL_ID") if value is None else value
     return value if value and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value) else None
+
+
+def blocked_info(role_id: str, terminal: str, record) -> dict | None:
+    """Who is blocked and the structured kind only; status.msg may hold prompt text or secrets and is never copied."""
+    status = record.get("status") if isinstance(record, dict) else None
+    state = status.get("state") if isinstance(status, dict) else status
+    if state != "blocked":
+        return None
+    kind = status.get("kind") if isinstance(status, dict) else None
+    return {"role": role_id, "terminal": terminal, "kind": kind if isinstance(kind, str) and re.fullmatch(r"[a-z_]{1,32}", kind) else "unknown"}
+
+
+def redact_record(record):
+    """Copy of an hc get record without status.msg."""
+    status = record.get("status") if isinstance(record, dict) else None
+    if not isinstance(status, dict):
+        return record
+    return {**record, "status": {k: v for k, v in status.items() if k != "msg"}}
 
 
 def role_launch_cmd(project: Path, role: dict, cwd: Path) -> list[str]:
@@ -252,11 +273,14 @@ def stop_team(project: Path, *, apply: bool = False, remove_worktrees: bool = Fa
         name = terminal_name(project, role["id"])
         item = {"role": role["id"], "terminal": name, "action": "not_running"}
         result.append(item)
+        enabled = role.get("enabled", True)
         try:
             active = existing_terminal(name, role_labels(project, role))
         except OrgError as exc:
-            item.update(action="skipped", reason=str(exc))
+            item.update(action="skipped" if enabled else "disabled", reason=str(exc))
             continue
+        if active is None and not enabled:
+            item["action"] = "disabled"
         if active is not None:
             if apply:
                 killed, removed = kill_and_remove(name)
@@ -293,7 +317,9 @@ def make_agent_prompt(project: Path, role: dict, pm: str | None = None) -> str:
         reviewer = resolve_role(doc, reviewer_id)
         route = (f"Your designated reviewer is {reviewer_id}, Herdr terminal "
                  f"{terminal_name(project, reviewer_id)}. On a coherent completed slice, "
-                 "report the branch/PR and test evidence directly to the reviewer via hc send; "
+                 "commit your report to your branch at .ai/handoff/TASK.md first, then report to the reviewer via hc send "
+                 "as BRANCH@COMMIT:.ai/handoff/TASK.md plus test evidence, so the evidence exists even if the send blocks. "
+                 "Your task packet is the absolute path the PM sent (.ai/tasks/TASK/packet.md in the root checkout): read it there, never edit it. "
                  "handle subsequent feedback with that reviewer without routing routine turns through PM. ")
     elif role.get("mode") == "reviewer":
         workers = [r for r in doc["roles"] if r.get("reviewer_role") == role["id"] and r.get("enabled", True)]
@@ -303,7 +329,11 @@ def make_agent_prompt(project: Path, role: dict, pm: str | None = None) -> str:
                  "directly back using hc send. Do not wake PM for normal review rounds. "
                  f"Stop patch churn and require RCA after {doc.get('policies', {}).get('review_rounds_before_rca', 3)} unproductive review/fix rounds. "
                  f"Notes about your workers (turn ended, blocked, exited) arrive here because you are their Herdr parent; handle them yourself. "
-                 + "Write each escalation as a new file .ai/inbox/UTCSTAMP-TASK-CODE.md (UTCSTAMP like 20260101T120000Z; create the folder if missing; "
+                 "The PM sends you the absolute path of an immutable task packet .ai/tasks/TASK/packet.md in the root checkout. On receipt create and solely own "
+                 "progress.md beside it: state, consecutive UNPRODUCTIVE rounds, accepted dependency commits, evidence refs as BRANCH@COMMIT:PATH. "
+                 "A repeated packet for a known task id is not a new task. If the packet has blocked_by, record the accepted prerequisite commit in progress.md before releasing the worker. "
+                 "Read a worker report with git show COMMIT:.ai/handoff/TASK.md. "
+                 + "Write each escalation as a new file .ai/inbox/UTCSTAMP-TASK-CODE-HEX4.md (UTCSTAMP like 20260101T120000Z; HEX4 is 4 random hex chars generated once and reused on retry; create the folder if missing; "
                  "use the escalation template from the agent-org-engineering skill) in the project root checkout. "
                  f"CODE is one of: {', '.join(ESCALATION_CODES)}. Never edit .ai/STATE.md: only the PM does. "
                  + (f"Then notify the PM: `hc send {pm} ESCALATION CODE TASK: .ai/inbox/FILE`. " if pm else
@@ -347,7 +377,7 @@ def launch_agent_process(project: Path, role_id: str, pm: str | None = None):
             env.pop("CODEX_HOME", None)
     model = role.get("model") or profile.get("model")
     effort = role.get("effort") or profile.get("effort")
-    cmd = [profile["command"]]
+    cmd = [profile["command"]] + (["--no-daemon"] if provider == "codex" else [])  # hc --skill: else commands run outside hc
     if profile.get("native_profile"):
         if provider != "codex":
             raise OrgError("native_profile is only supported for Codex")

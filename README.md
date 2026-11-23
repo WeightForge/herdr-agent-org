@@ -82,9 +82,9 @@ For research or content, use only `agent-org-manager` plus relevant domain crite
 | `agentorg doctor` | Availability preflight (not live authentication) |
 | `agentorg team plan` | Preview exact role launch arguments and worktree paths |
 | `agentorg team up --apply` | Start/reuse terminals and create worker worktrees |
-| `agentorg team status` | Query recognized live terminals; reports `inbox_pending` (unhandled `.ai/inbox/*.md` escalations) |
-| `agentorg team down [--apply] [--remove-worktrees]` | Dry-run by default; `--apply` kills then removes only terminals whose labels match this project (workers first). `--remove-worktrees` runs `git worktree remove` without `--force` (dirty worktrees are kept; branches never deleted) |
-| `agentorg team smoke [--keep]` | Live end-to-end check against the running Herdr core using fake agents (zero model tokens); run it from an installed `agentorg`; exit code 1 on any failed check; always cleans up unless `--keep` |
+| `agentorg team status` | Query recognized live terminals; reports `inbox_pending` (unhandled `.ai/inbox/*.md` escalations) and `blocked` (`{role, terminal, kind}` per blocked terminal; never prompt text, read-only, sends no input) |
+| `agentorg team down [--apply] [--remove-worktrees]` | Dry-run by default; `--apply` kills then removes only terminals whose labels match this project (workers first). `--remove-worktrees` runs `git worktree remove` without `--force` (dirty worktrees are kept; branches never deleted). Disabled roles report `disabled`; a disabled role's terminal is still stopped if it is live and its labels match |
+| `agentorg team smoke [--keep]` | Live end-to-end check against the running Herdr core using fake agents (zero model tokens; includes a codex-provider fake that must receive `--no-daemon`, and asserts `status.blocked == []`); run it from an installed `agentorg`; exit code 1 on any failed check; always cleans up unless `--keep` |
 | `agentorg team reconcile` | Refresh untracked local runtime manifest from Herdr |
 | `agentorg team send ROLE "TASK"` | Send a scoped message to a role via `hc send` |
 | `agentorg install --target both` | Copy skills into local agent directories |
@@ -134,10 +134,21 @@ Antigravity can serve as an interactive PM through its skill and `hc` shell call
 
 ### PM inbox
 
-Reviewers write escalations as new files `.ai/inbox/<UTC YYYYmmddTHHMMSSZ>-<task>-<code>.md` in the project root checkout and, if they know the PM address, `hc send` a one-line pointer. Only the PM edits `.ai/STATE.md`; on every wake it reads `.ai/inbox/*.md`, handles each file and moves it to `.ai/inbox/done/`. `agentorg init` ignores `inbox/` in `.ai/.gitignore` (existing `.gitignore` files are not rewritten; add `inbox/` yourself).
+Reviewers write escalations as new files `.ai/inbox/<UTC YYYYmmddTHHMMSSZ>-<task>-<code>-<4 hex>.md` (the 4 hex chars are generated once and reused on retry) in the project root checkout and, if they know the PM address, `hc send` a one-line pointer. Only the PM edits `.ai/STATE.md`; on every wake it reads `.ai/inbox/*.md`, skips ids already in the "Handled escalations" list of `.ai/STATE.md`, handles each other file, records its id there BEFORE moving the file to `.ai/inbox/done/`, and reconciles against evidence before replaying an id whose action may have happened unrecorded. `agentorg init` ignores `inbox/` in `.ai/.gitignore` (existing `.gitignore` files are not rewritten; add `inbox/` yourself).
+
+### Task files and file-first handoff
+
+Software tasks live in the root checkout under `.ai/tasks/<id>/` (versioned project state: do not gitignore it; `agentorg init` does not create it). Every file has one writer:
+
+- `packet.md`: written once by the PM before dispatch (immutable). The PM sends the worker and the paired reviewer only its absolute path. Optional `blocked_by: <task id>`; the dependent task's reviewer records the accepted prerequisite commit in `progress.md` before releasing the dependent worker.
+- `progress.md`: created and solely owned by the reviewer on receipt (the acknowledgement): state, consecutive UNPRODUCTIVE rounds (RCA counter), accepted dependency commits, evidence refs as `<branch>@<commit>:<path>`. Receivers dedupe by task id.
+- Recovery: packet without `progress.md` = unacknowledged, resend the same path (safe, deduped); packet with `progress.md` = in flight, never re-dispatch.
+- The worker commits its report to its branch at `.ai/handoff/<task>.md` BEFORE `hc send`, then sends `<branch>@<commit>:.ai/handoff/<task>.md`; the reviewer reads it with `git show <commit>:<path>`. If the send blocks, the evidence already exists.
+
+Codex roles are launched with `--no-daemon` (required by `hc --skill`, otherwise Codex commands run outside hc) and carry an extra label `nodaemon=1`. A Codex terminal started by an older agentorg lacks that label, so `team up` refuses to reuse it ("label differs"): stop it deliberately (`team down --apply`) and start it again.
 
 ### Unattended operation
 
-Agents run `hc send/read/get/ls`, and each provider prompts the human for commands it has not been allowed to run. Pre-allow just those commands in each provider's own settings and do not use dangerous skip-permission flags. Claude Code (`settings.json`): `"permissions": {"allow": ["Bash(hc send:*)", "Bash(hc read:*)", "Bash(hc get:*)", "Bash(hc ls:*)"]}`. For Codex and Antigravity configure their equivalent allowlist or approval mode. Providers with folder trust (Antigravity) need the `.agentorg-worktrees` folder trusted. Agents must never answer each other's permission prompts (`hc keys` to a blocked agent is forbidden); a blocked worker is escalated as `blocked` to the human.
+Agents run `hc send/read/get/ls`, and each provider prompts the human for commands it has not been allowed to run. Pre-allow just those commands in each provider's own settings and do not use dangerous skip-permission flags. Prefer exact targets: terminal names are `ao-<project>-<role>-<hash>`, so Claude Code (`settings.json`) can use `"permissions": {"allow": ["Bash(hc send ao-myproj-*)", "Bash(hc read:*)", "Bash(hc get:*)", "Bash(hc ls:*)"]}` where your version supports mid-pattern wildcards. A prefix rule (`Bash(hc send:*)`) matches any trailing arguments and may also allow flags such as `--force`, so where a provider cannot express the restriction keep interactive approval. For Codex and Antigravity configure their equivalent allowlist or approval mode. Folder trust remains a per-worktree human decision (for example Antigravity for `.agentorg-worktrees`). `team status` lists blocked terminals (`blocked`: role, terminal, kind) so the PM can tell the human which terminal needs action. Agents must never answer each other's permission prompts (`hc keys` to a blocked agent is forbidden); a blocked worker is escalated as `blocked` to the human.
 
 For existing teams, configure reviewer pairing with `agentorg role set backend-worker --reviewer-role technical-reviewer`. Existing agent processes are not re-prompted or restarted by installing updated skills; communicate the new handoff policy explicitly to running agents, and do not relaunch an active terminal blindly.

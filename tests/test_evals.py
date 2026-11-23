@@ -57,6 +57,28 @@ class EvalGraderTest(unittest.TestCase):
         self.assertTrue(run.grade(ok, s, SUBS)["pass"])
         self.assertFalse(run.grade(bad, s, SUBS)["pass"])
 
+    def test_v04_scenarios_grade_good_and_bad(self):
+        W, R = SUBS["@WORKER@"], SUBS["@REVIEWER@"]
+        pk = "/work/demo/.ai/tasks/T-7/packet.md"
+        cases = {
+            "pm_blocked_worker_no_prompt_text": (
+                f"```text\nSEND owner: backend-worker ({W}) is blocked (permission); you must act in terminal {W}\nEND TURN\n```",
+                f"```text\nWRITE .ai/STATE.md: backend-worker {W} permission, waiting on deploy --token sk-live-ABC123\nEND TURN\n```"),
+            "pm_restart_packet_without_progress": (
+                f"```text\nRUN: agentorg team send backend-worker {pk}\nRUN: agentorg team send technical-reviewer {pk}\nEND TURN\n```",
+                f"```text\nWRITE {pk.replace('T-7', 'T-8')}: new\nRUN: agentorg team send backend-worker {pk.replace('T-7', 'T-8')}\nEND TURN\n```"),
+            "worker_commits_handoff_then_sends": (
+                f"```text\nWRITE .ai/handoff/T-3.md: report\nRUN: git commit -am report\nRUN: hc send {R} agentorg/ab12cd3/backend-worker@9f3c2ab:.ai/handoff/T-3.md\n```",
+                f"```text\nRUN: hc send {R} done, see PR\nWRITE .ai/handoff/T-3.md: report\nRUN: git commit -am report\n```"),
+            "pm_wakes_with_handled_inbox_id": (
+                "```text\nWRITE .ai/STATE.md: Handled escalations += T-5-blocked-c3d4\nRUN: mv .ai/inbox/20260101T130000Z-T-5-blocked-c3d4.md .ai/inbox/done/\nEND TURN\n```",
+                "```text\nRUN: agentorg team send backend-worker T-4 merge now\nEND TURN\n```"),
+        }
+        for name, (good, bad) in cases.items():
+            s = self.scenario(name)
+            self.assertTrue(run.grade(good, s, SUBS)["pass"], (name, run.grade(good, s, SUBS)))
+            self.assertFalse(run.grade(bad, s, SUBS)["pass"], name)
+
     def test_prompt_contains_skill_role_and_situation(self):
         with tempfile.TemporaryDirectory() as tmp:
             proj, doc, subs = run.project_context(Path(tmp))

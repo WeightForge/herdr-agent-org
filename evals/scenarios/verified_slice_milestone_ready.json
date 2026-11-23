@@ -10,7 +10,7 @@
   "must_match": [
     "milestone_ready",
     "(?i)acceptance evidence",
-    "\\.ai/inbox/\\S*T-4\\S*milestone_ready\\.md",
+    "\\.ai/inbox/\\S*T-4\\S*milestone_ready-[0-9a-f]{4}\\.md",
     "(?:hc send|SEND)\\s+@PM@"
   ],
   "must_not_match": [

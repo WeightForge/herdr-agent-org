@@ -1,0 +1,21 @@
+{
+  "name": "pm_wakes_with_handled_inbox_id",
+  "role": "pm",
+  "skills": [
+    "agent-org-manager",
+    "agent-org-recovery"
+  ],
+  "situation": "You are woken. .ai/inbox/ holds two files: 20260101T120000Z-T-4-milestone_ready-a1b2.md and 20260101T130000Z-T-5-blocked-c3d4.md. In .ai/STATE.md the 'Handled escalations' list already contains 20260101T120000Z-T-4-milestone_ready-a1b2. The T-5 escalation says worker output is waiting on a human permission decision in terminal @WORKER@. Do what you do on this wake.",
+  "must_match": [
+    "T-5",
+    "c3d4",
+    "STATE\\.md[\\s\\S]*inbox/done/",
+    "END TURN"
+  ],
+  "must_not_match": [
+    "(agentorg team send|hc send)[^\\n]*T-4",
+    "git merge",
+    "gh pr merge",
+    "hc\\s+keys"
+  ]
+}

@@ -92,7 +92,7 @@ class V03Test(Fixture):
         with_pm = runtime.make_agent_prompt(self.project, reviewer, "t7")
         no_pm = runtime.make_agent_prompt(self.project, reviewer)
         for prompt in (with_pm, no_pm):
-            self.assertIn(".ai/inbox/UTCSTAMP-TASK-CODE.md", prompt)
+            self.assertIn(".ai/inbox/UTCSTAMP-TASK-CODE-HEX4.md", prompt)
             self.assertIn("Never edit .ai/STATE.md", prompt)
             self.assertNotIn("write the escalation", prompt)
         self.assertIn("hc send t7 ESCALATION CODE TASK: .ai/inbox/FILE", with_pm)

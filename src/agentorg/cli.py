@@ -12,7 +12,7 @@ from pathlib import Path
 from . import __version__
 from .config import (OrgError, load_profiles, save_profiles, profiles_path, validate_id,
                      load_project, validate_project, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
-from .runtime import (start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
+from .runtime import (blocked_info, redact_record, start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
                       existing_terminal, run_process, validate_binaries, which, stop_team, inbox_pending)
 
 
@@ -104,7 +104,7 @@ def init_project(ns):
         ".ai/TEAM.json": json.dumps(template, indent=2, ensure_ascii=False) + "\n",
         ".ai/PROJECT.md": f"# {ns.name or root.name}\n\n## Mission\nDescribe desired outcomes and users.\n\n## Non-goals\n- No publishing, deployment, or release without explicit human approval.\n\n## Constraints\nDocument important domain, legal, budget and system constraints.\n",
         ".ai/ROADMAP.md": "# Capability milestones (no dates required)\n\n## M0 — Foundations\n- [ ] Identify critical assumptions, tests, and dependencies\n\n## Next\n- [ ] Define first meaningful deliverable and acceptance criteria\n",
-        ".ai/STATE.md": "# Project checkpoint\n\n## Current milestone\nM0 — Foundations\n\n## Active tasks\nNone yet.\n\n## Open PRs/artifacts\nNone yet.\n\n## Blockers\nNone yet.\n\n## Next action\nReview project scope and assign first scoped task.\n",
+        ".ai/STATE.md": "# Project checkpoint\n\n## Current milestone\nM0 — Foundations\n\n## Active tasks\nNone yet.\n\n## Open PRs/artifacts\nNone yet.\n\n## Blockers\nNone yet.\n\n## Handled escalations\nNone yet. The PM appends inbox ids here before moving files to inbox/done/.\n\n## Next action\nReview project scope and assign first scoped task.\n",
         ".ai/DECISIONS.md": "# Decisions\n\nRecord context, options, chosen action, evidence, and reversible/irreversible impacts.\n",
         "QUESTION.md": "# Questions for the human owner\n\nRecord only decisions requiring human approval, with options, recommendation and safe work while awaiting answer.\n",
         ".ai/.gitignore": "RUNTIME.json\ninbox/\n",
@@ -282,7 +282,7 @@ def team_cmd(ns):
             raise OrgError(f"hc send failed: {result.stderr.strip() or result.stdout.strip()}")
         print(result.stdout.strip() or f"Send check-in returned {result.returncode}; inspect terminal before retry.")
         return
-    status = []
+    status, blocked = [], []
     for role in doc["roles"]:
         if not role.get("enabled", True):
             continue
@@ -290,7 +290,9 @@ def team_cmd(ns):
         try:
             active = existing_terminal(name, role_labels(root, role))
             status.append({"role": role["id"], "terminal": name, "live": active is not None,
-                           "details": active if active is not None else None})
+                           "details": redact_record(active) if active is not None else None})
+            if blocked_info(role["id"], name, active):
+                blocked.append(blocked_info(role["id"], name, active))
         except OrgError as exc:
             status.append({"role": role["id"], "terminal": name, "live": False, "details": None, "error": str(exc)})
     if ns.op == "reconcile":
@@ -298,7 +300,7 @@ def team_cmd(ns):
         for s in status:
             runtime.setdefault("terminals", {}).setdefault(s["role"], {}).update({"name": s["terminal"], "live": s["live"]})
         write_json(root / ".ai" / "RUNTIME.json", runtime)
-    print(json.dumps({"project": doc["project_id"], "inbox_pending": inbox_pending(root), "status": status}, indent=2))
+    print(json.dumps({"project": doc["project_id"], "inbox_pending": inbox_pending(root), "blocked": blocked, "status": status}, indent=2))
 
 
 def main(argv=None):
