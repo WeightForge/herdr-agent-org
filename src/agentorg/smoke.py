@@ -84,7 +84,7 @@ def _setup(ctx: dict) -> None:
     shim = _script(tmp / "bin" / "fakeagent", [_set("AGENTORG_FAKE_DIR", str(ctx["fake"])),
                                                f'"{sys.executable}" -m agentorg._fake_agent ' + ('%*' if WIN else '"$@"')])
     profile = {"provider": "claude", "command": shim, "config_dir": None, "native_profile": None, "model": "fake-model", "effort": "low"}
-    write_json(ctx["home"] / "profiles.json", {"schema_version": 1, "profiles": {"reviewer": profile, "implementer": dict(profile)}})
+    write_json(ctx["home"] / "profiles.json", {"schema_version": 1, "profiles": {"reviewer": profile, "implementer": dict(profile, provider="codex")}})
     run_process(["git", "init", "-q"], cwd=proj, timeout=30)
     with contextlib.redirect_stdout(io.StringIO()):
         init_project(SimpleNamespace(path=str(proj), name="smoke", template="engineering"))
@@ -153,6 +153,15 @@ def _run_checks(ctx: dict, report: dict, keep: bool) -> None:
         _need(f"hc send {state['pm_id']}" in prompt, "reviewer prompt lacks `hc send <pm id>`")
         return "prompt addresses the PM terminal"
 
+    def worker_no_daemon():
+        _need_pm()
+        wid = _hc_get(ctx["wrk"])["address"]
+        f = ctx["fake"] / (wid + ".json")
+        _need(_wait(f.exists, 20), "worker fake agent never recorded its launch")
+        argv = json.loads(f.read_text(encoding="utf-8"))["argv"]
+        _need("--no-daemon" in argv, f"codex worker argv lacks --no-daemon: {argv}")
+        return argv
+
     def second_up():
         rows = _json_out(_agentorg(ctx, "team", "up", "--apply", "--path", str(proj)))["roles"]
         _need(all(x["action"] == "reused" for x in rows), f"not reused: {[x['action'] for x in rows]}")
@@ -169,6 +178,7 @@ def _run_checks(ctx: dict, report: dict, keep: bool) -> None:
         data = _json_out(_agentorg(ctx, "team", "status", "--path", str(proj)))
         _need(data["status"] and all(x["live"] and "error" not in x for x in data["status"]), f"not all live: {data['status']}")
         _need(data["inbox_pending"] == 0, "inbox_pending != 0")
+        _need(data["blocked"] == [], f"blocked: {data['blocked']}")
         return {x["role"]: x["live"] for x in data["status"]}
 
     def reconcile():
@@ -191,7 +201,7 @@ def _run_checks(ctx: dict, report: dict, keep: bool) -> None:
         return {x["role"]: x["action"] for x in rows}
 
     steps = [("reviewer_parent_is_pm", reviewer_parent), ("worker_parent_is_reviewer", worker_parent),
-             ("reviewer_prompt_has_pm_address", reviewer_prompt), ("second_up_all_reused", second_up),
+             ("reviewer_prompt_has_pm_address", reviewer_prompt), ("codex_worker_has_no_daemon", worker_no_daemon), ("second_up_all_reused", second_up),
              ("team_send_reaches_worker", send), ("team_status_all_live", status),
              ("reconcile_keeps_cwd_and_pm", reconcile)]
     if not keep:

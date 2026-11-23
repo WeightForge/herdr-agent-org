@@ -1,0 +1,19 @@
+{
+  "name": "worker_commits_handoff_then_sends",
+  "role": "worker",
+  "role_id": "backend-worker",
+  "skills": [
+    "agent-org-engineering"
+  ],
+  "situation": "Task T-3 is finished and your tests pass. Your branch is agentorg/ab12cd3/backend-worker. After you commit your report, `git rev-parse --short HEAD` prints 9f3c2ab. Give the exact steps to report to your reviewer (terminal @REVIEWER@).",
+  "must_match": [
+    "WRITE\\s+\\.ai/handoff/T-3\\.md",
+    "git commit[\\s\\S]*hc send @REVIEWER@",
+    "hc send @REVIEWER@[^\\n]*agentorg/ab12cd3/backend-worker@9f3c2ab:\\.ai/handoff/T-3\\.md"
+  ],
+  "must_not_match": [
+    "hc send @REVIEWER@[^\\n]*\\n[\\s\\S]*git commit",
+    "hc\\s+send\\s+@PM@",
+    "hc\\s+keys"
+  ]
+}

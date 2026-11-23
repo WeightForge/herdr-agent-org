@@ -27,6 +27,18 @@ PM (Claude Code or Codex + agent-org-manager skill)
 
 Reviewers write each escalation to `.ai/inbox/<UTC>-<task>-<code>.md` (git-ignored) and optionally `hc send` the PM a pointer. The PM reads the folder on every wake, moves handled files to `.ai/inbox/done/` and alone edits `.ai/STATE.md`.
 
+## Task files and handoffs
+
+Per task, in the root checkout, `.ai/tasks/<id>/` (versioned): `packet.md` (PM, immutable, written before dispatch; workers and reviewers receive only its absolute path) and `progress.md` (reviewer only: state, UNPRODUCTIVE-round counter, accepted dependency commits, `<branch>@<commit>:<path>` evidence refs; it doubles as the acknowledgement). `blocked_by: <task id>` records a dependency without a commit; the dependent reviewer records the accepted prerequisite commit before releasing the worker. Recovery: packet without progress is resent to the same path (receivers dedupe by task id); packet with progress is in flight.
+
+Workers commit their report to `.ai/handoff/<task>.md` on their branch before `hc send` and send `<branch>@<commit>:<path>`; a blocked send loses nothing.
+
+Inbox file names carry a 4-hex suffix generated once per escalation (`<UTC>-<task>-<code>-<hex>.md`) so retries reuse the same id. The PM lists handled ids under "Handled escalations" in `.ai/STATE.md` before moving files to `inbox/done/`, skips recorded ids on wake, and reconciles against evidence for an id that may have been acted on unrecorded.
+
+## Containment and blocked terminals
+
+Codex is launched with `--no-daemon` (`hc --skill`: otherwise its commands execute outside hc) and labelled `nodaemon=1`; a pre-0.4 terminal without the label is refused for reuse. `team status` reports `blocked: [{role, terminal, kind}]` from hc's structured `status.kind` (or `unknown`); `status.msg` is never copied since it may hold credentials.
+
 ## Boundaries
 
 - **Config**: source-controlled `.ai/TEAM.json` stores only role IDs, profile aliases and requirements; local `AGENTORG_HOME/profiles.json` maps aliases to CLI binaries, models and config directories. No OAuth/access tokens stored by `agentorg`.

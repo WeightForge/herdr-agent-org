@@ -1,0 +1,21 @@
+{
+  "name": "pm_restart_packet_without_progress",
+  "role": "pm",
+  "skills": [
+    "agent-org-recovery",
+    "agent-org-manager",
+    "agent-org-engineering"
+  ],
+  "situation": "You are a replacement PM after a restart. The team is live. In the root checkout /work/demo you find /work/demo/.ai/tasks/T-7/packet.md and NO progress.md next to it; nothing else is in .ai/tasks/. The worker is backend-worker (reviewer technical-reviewer, terminal @REVIEWER@). Do what recovery requires for task T-7.",
+  "must_match": [
+    "/work/demo/\\.ai/tasks/T-7/packet\\.md",
+    "agentorg team send backend-worker",
+    "(agentorg team send technical-reviewer|hc send @REVIEWER@)",
+    "END TURN"
+  ],
+  "must_not_match": [
+    "T-(?!7\\b)\\d+",
+    "WRITE\\s+\\S*packet\\.md",
+    "WRITE\\s+\\S*progress\\.md"
+  ]
+}
