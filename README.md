@@ -76,16 +76,19 @@ For research or content, use only `agent-org-manager` plus relevant domain crite
 | Command | Effect |
 |---|---|
 | `agentorg init --template engineering` | Create missing `.ai` project manifests; no overwrite |
-| `agentorg profile add NAME --provider claude|codex ...` | Save profile alias in user config only |
+| `agentorg profile add NAME --provider claude|codex|antigravity ...` | Save profile alias in user config only (`antigravity` runs `agy`; no `--config-dir`/`--native-profile`) |
 | `agentorg profile list` | Inspect aliases; no tokens |
 | `agentorg role list / role set ROLE --profile NAME` | Update team manifest |
 | `agentorg doctor` | Availability preflight (not live authentication) |
 | `agentorg team plan` | Preview exact role launch arguments and worktree paths |
 | `agentorg team up --apply` | Start/reuse terminals and create worker worktrees |
-| `agentorg team status` | Query recognized live terminals |
+| `agentorg team status` | Query recognized live terminals; reports `inbox_pending` (unhandled `.ai/inbox/*.md` escalations) |
+| `agentorg team down [--apply] [--remove-worktrees]` | Dry-run by default; `--apply` kills then removes only terminals whose labels match this project (workers first). `--remove-worktrees` runs `git worktree remove` without `--force` (dirty worktrees are kept; branches never deleted) |
+| `agentorg team smoke [--keep]` | Live end-to-end check against the running Herdr core using fake agents (zero model tokens); run it from an installed `agentorg`; exit code 1 on any failed check; always cleans up unless `--keep` |
 | `agentorg team reconcile` | Refresh untracked local runtime manifest from Herdr |
 | `agentorg team send ROLE "TASK"` | Send a scoped message to a role via `hc send` |
 | `agentorg install --target both` | Copy skills into local agent directories |
+| `python evals/run.py --agent-cmd "agy --model M --mode plan -p"` | Skill evals: deterministic regex grading of an agent's planned replies (see `evals/`) |
 
 ## Safety & limitations
 
@@ -127,6 +130,14 @@ agentorg install --target all          # all three
 
 `both` remains the backwards-compatible Claude + Codex alias. When updating an older install, use `--force` **after checking for local custom edits**. Codex can invoke `$agent-org-manager`; Antigravity App/IDE supports `/agent-org-manager`. Skill discovery does not confer access to Herdr: the agent must have shell/tool permission to call `hc` in an environment connected to the running Herdr Core.
 
-Antigravity can serve as an **interactive PM** through its skill and `hc` shell calls. v2.1 does **not** launch Antigravity as a Herdr worker (`agentorg profile add` intentionally supports `claude` and `codex` only), and a PM outside a Herdr terminal may not receive `hc send` push messages; reviewers should keep durable reports until it is invoked again.
+Antigravity can serve as an interactive PM through its skill and `hc` shell calls, and (v0.3) as a launched role: `agentorg profile add NAME --provider antigravity [--model M] [--effort low|medium|high|xhigh|max]` starts `agy [--model M] [--effort E] -i <prompt>`. A PM outside a Herdr terminal may not receive `hc send` push messages: reviewers write each escalation to `.ai/inbox/` and the PM reads that folder whenever it wakes.
+
+### PM inbox
+
+Reviewers write escalations as new files `.ai/inbox/<UTC YYYYmmddTHHMMSSZ>-<task>-<code>.md` in the project root checkout and, if they know the PM address, `hc send` a one-line pointer. Only the PM edits `.ai/STATE.md`; on every wake it reads `.ai/inbox/*.md`, handles each file and moves it to `.ai/inbox/done/`. `agentorg init` ignores `inbox/` in `.ai/.gitignore` (existing `.gitignore` files are not rewritten; add `inbox/` yourself).
+
+### Unattended operation
+
+Agents run `hc send/read/get/ls`, and each provider prompts the human for commands it has not been allowed to run. Pre-allow just those commands in each provider's own settings and do not use dangerous skip-permission flags. Claude Code (`settings.json`): `"permissions": {"allow": ["Bash(hc send:*)", "Bash(hc read:*)", "Bash(hc get:*)", "Bash(hc ls:*)"]}`. For Codex and Antigravity configure their equivalent allowlist or approval mode. Providers with folder trust (Antigravity) need the `.agentorg-worktrees` folder trusted. Agents must never answer each other's permission prompts (`hc keys` to a blocked agent is forbidden); a blocked worker is escalated as `blocked` to the human.
 
 For existing teams, configure reviewer pairing with `agentorg role set backend-worker --reviewer-role technical-reviewer`. Existing agent processes are not re-prompted or restarted by installing updated skills; communicate the new handoff policy explicitly to running agents, and do not relaunch an active terminal blindly.

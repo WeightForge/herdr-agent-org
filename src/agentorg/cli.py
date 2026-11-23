@@ -11,9 +11,9 @@ from pathlib import Path
 
 from . import __version__
 from .config import (OrgError, load_profiles, save_profiles, profiles_path, validate_id,
-                     load_project, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
+                     load_project, validate_project, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
 from .runtime import (start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
-                      existing_terminal, run_process, validate_binaries, which)
+                      existing_terminal, run_process, validate_binaries, which, stop_team, inbox_pending)
 
 
 def add_parser() -> argparse.ArgumentParser:
@@ -30,9 +30,9 @@ def add_parser() -> argparse.ArgumentParser:
     ps = q.add_subparsers(dest="op", required=True)
     add = ps.add_parser("add", help="Create/update a named local profile")
     add.add_argument("name")
-    add.add_argument("--provider", choices=("claude", "codex"), required=True)
+    add.add_argument("--provider", choices=("claude", "codex", "antigravity"), required=True)
     add.add_argument("--command", dest="executable", help="Executable name/path, not a shell alias")
-    add.add_argument("--config-dir", help="CLAUDE_CONFIG_DIR or CODEX_HOME; no secret values")
+    add.add_argument("--config-dir", help="CLAUDE_CONFIG_DIR or CODEX_HOME (not antigravity); no secret values")
     add.add_argument("--native-profile", help="Optional Codex --profile name")
     add.add_argument("--model")
     add.add_argument("--effort")
@@ -59,11 +59,15 @@ def add_parser() -> argparse.ArgumentParser:
 
     q = sub.add_parser("team", help="Plan, launch and monitor Herdr team")
     ts = q.add_subparsers(dest="op", required=True)
-    for op in ("plan", "up", "status", "reconcile"):
+    for op in ("plan", "up", "status", "reconcile", "down"):
         a = ts.add_parser(op)
         a.add_argument("--path", default=".")
-        if op == "up":
-            a.add_argument("--apply", action="store_true", help="Required to actually create worktrees and start agents")
+        if op in ("up", "down"):
+            a.add_argument("--apply", action="store_true", help="Required to actually create/stop worktrees and agents")
+        if op == "down":
+            a.add_argument("--remove-worktrees", action="store_true", help="git worktree remove (no --force) for stopped workers; branches are kept")
+    a = ts.add_parser("smoke", help="Live end-to-end check with fake agents (no model tokens)")
+    a.add_argument("--keep", action="store_true", help="Keep the temp project and terminals for inspection")
     a = ts.add_parser("send", help="Send scoped task to a role")
     a.add_argument("role")
     a.add_argument("message")
@@ -103,7 +107,7 @@ def init_project(ns):
         ".ai/STATE.md": "# Project checkpoint\n\n## Current milestone\nM0 — Foundations\n\n## Active tasks\nNone yet.\n\n## Open PRs/artifacts\nNone yet.\n\n## Blockers\nNone yet.\n\n## Next action\nReview project scope and assign first scoped task.\n",
         ".ai/DECISIONS.md": "# Decisions\n\nRecord context, options, chosen action, evidence, and reversible/irreversible impacts.\n",
         "QUESTION.md": "# Questions for the human owner\n\nRecord only decisions requiring human approval, with options, recommendation and safe work while awaiting answer.\n",
-        ".ai/.gitignore": "RUNTIME.json\n",
+        ".ai/.gitignore": "RUNTIME.json\ninbox/\n",
     }
     created, skipped = [], []
     for rel, content in paths.items():
@@ -137,6 +141,8 @@ def profile_cmd(ns):
         raise OrgError(f"Profile '{ns.name}' exists; use --replace to update it")
     if ns.native_profile and ns.provider != "codex":
         raise OrgError("--native-profile is supported for Codex only")
+    if ns.provider == "antigravity" and ns.config_dir:
+        raise OrgError("--config-dir is not supported for antigravity")
     for opt in ("model", "effort", "native_profile"):
         if getattr(ns, opt):
             check_safe_text(getattr(ns, opt), "--" + opt.replace("_", "-"))
@@ -146,7 +152,7 @@ def profile_cmd(ns):
         if not path.is_dir():
             raise OrgError(f"Config directory does not exist: {path}")
         config_dir = str(path)
-    command = ns.executable or ns.provider
+    command = ns.executable or ("agy" if ns.provider == "antigravity" else ns.provider)
     if not command or any(ch in command for ch in ("\n", "\r", "\0")):
         raise OrgError("Invalid executable command")
     if not which(command):
@@ -185,6 +191,7 @@ def role_cmd(ns):
         role["enabled"] = False
     if ns.enable:
         role["enabled"] = True
+    validate_project(doc)  # never write a manifest that load_project would reject
     write_json(project_file(root), doc)
     print(f"Updated role {ns.role} in {project_file(root)}")
 
@@ -192,7 +199,7 @@ def role_cmd(ns):
 def doctor(ns):
     root = rootpath(ns.path)
     checks = {"python": sys.version.split()[0], "hc": bool(which("hc")), "git": bool(which("git")),
-              "claude": bool(which("claude")), "codex": bool(which("codex")), "project_initialized": project_file(root).exists()}
+              "claude": bool(which("claude")), "codex": bool(which("codex")), "agy": bool(which("agy")), "project_initialized": project_file(root).exists()}
     if checks["project_initialized"]:
         doc = load_project(root)
         checks["project_id"] = doc["project_id"]
@@ -238,6 +245,13 @@ def install_skills(ns):
 
 
 def team_cmd(ns):
+    if ns.op == "smoke":
+        from .smoke import run_smoke
+        report = run_smoke(keep=ns.keep)
+        print(json.dumps(report, indent=2))
+        if not report["ok"]:
+            sys.exit(1)
+        return
     root = rootpath(ns.path)
     doc = load_project(root)
     if ns.op in ("plan", "up"):
@@ -251,6 +265,12 @@ def team_cmd(ns):
             print("No agents started. Add --apply to launch.")
         return
     hc_ready()
+    if ns.op == "down":
+        items = stop_team(root, apply=ns.apply, remove_worktrees=ns.remove_worktrees)
+        print(json.dumps({"mode": "apply" if ns.apply else "dry_run", "roles": items}, indent=2))
+        if not ns.apply:
+            print("Nothing stopped. Add --apply to stop the listed terminals.")
+        return
     if ns.op == "send":
         role = resolve_role(doc, ns.role)
         name = terminal_name(root, role["id"])
@@ -278,7 +298,7 @@ def team_cmd(ns):
         for s in status:
             runtime.setdefault("terminals", {}).setdefault(s["role"], {}).update({"name": s["terminal"], "live": s["live"]})
         write_json(root / ".ai" / "RUNTIME.json", runtime)
-    print(json.dumps({"project": doc["project_id"], "status": status}, indent=2))
+    print(json.dumps({"project": doc["project_id"], "inbox_pending": inbox_pending(root), "status": status}, indent=2))
 
 
 def main(argv=None):

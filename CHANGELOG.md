@@ -1,3 +1,12 @@
+## 0.3.0 — smoke, down, inbox, evals
+- `team smoke [--keep]`: live end-to-end check with fake agents (no model tokens); cleans up after itself.
+- `team down [--apply] [--remove-worktrees]`: label-checked stop (workers first), worktrees removed without `--force`.
+- PM inbox: reviewers write escalations to `.ai/inbox/`; only the PM edits `STATE.md`; `team status` reports `inbox_pending`.
+- Provider `antigravity` (`agy ... -i <prompt>`); doctor checks `agy`.
+- Policy: agents never answer or press keys on another agent's permission prompt; unattended-operation guidance.
+- Fixes: `role set` validates before writing and `load_project` only checks enabled workers' reviewer routes; JSON files accept a UTF-8 BOM.
+- `evals/`: deterministic skill evals (regex grading, no LLM judge).
+
 ## 0.2.2 — audit fixes
 - Launcher resolves provider executables with `which()` (fixes npm `codex.cmd` on Windows).
 - `title`/`focus` in TEAM.json reject shell metacharacters and control characters (cmd.exe shim injection).
