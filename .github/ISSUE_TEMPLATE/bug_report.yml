@@ -1,0 +1,29 @@
+name: Bug report
+about: Report a reproducible behavior (remove secrets and private repo details first)
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe what happened and what was expected.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Windows 11, Python 3.12, hc 0.x, Claude/Codex version
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction (no credentials)
+      description: Steps using a disposable project; include dry-run/apply distinction.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs / test output (redacted)
+      description: Remove tokens, private paths, account emails and internal repository identifiers.

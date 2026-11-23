@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+dist/
+build/
+.coverage
+# Local run state/credentials should never be committed
+.ai/RUNTIME.json
+**/.ai/RUNTIME.json
+.env
+.env.*
+!.env.example

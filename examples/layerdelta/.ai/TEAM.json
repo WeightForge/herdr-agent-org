@@ -1,0 +1,61 @@
+{
+  "schema_version": 2,
+  "project_id": "layerdelta",
+  "kind": "software",
+  "human_approval": {
+    "merge": true,
+    "release": true,
+    "deploy": true,
+    "destructive_changes": true
+  },
+  "policies": {
+    "max_parallel_workers": 2,
+    "review_rounds_before_rca": 3,
+    "default_mode": "dry_run",
+    "isolate_worker_worktrees": true,
+    "pm_mode": "coordinator",
+    "reporting": "worker_to_reviewer_to_pm"
+  },
+  "roles": [
+    {
+      "id": "ai-scientist",
+      "title": "Senior AI Scientist",
+      "mode": "reviewer",
+      "profile": "claude-work",
+      "model": "opus",
+      "effort": "medium",
+      "focus": "Weight-space architecture, model support, benchmarks, independent technical review",
+      "enabled": true
+    },
+    {
+      "id": "ai-engineer",
+      "title": "Senior AI Engineer",
+      "mode": "worker",
+      "profile": "claude-pro",
+      "model": "sonnet",
+      "effort": "high",
+      "focus": "AI/backend/model import/weight transformations/tests",
+      "enabled": true
+    },
+    {
+      "id": "ux-designer",
+      "title": "Senior UX Designer",
+      "mode": "reviewer",
+      "profile": "claude-work",
+      "model": "opus",
+      "effort": "medium",
+      "focus": "Interaction, model architecture visualization and visual quality review",
+      "enabled": true
+    },
+    {
+      "id": "frontend",
+      "title": "Senior Frontend Engineer",
+      "mode": "worker",
+      "profile": "codex-personal",
+      "model": "gpt-6.2-sol",
+      "effort": "medium",
+      "focus": "Desktop app/frontend visualization and interaction implementation",
+      "enabled": true
+    }
+  ]
+}

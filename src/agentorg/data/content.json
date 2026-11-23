@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "project_id": "change-me",
+  "kind": "content",
+  "human_approval": {
+    "publish": true,
+    "significant_spend": true,
+    "external_data_transfer": true
+  },
+  "policies": {
+    "max_parallel_workers": 2,
+    "default_mode": "dry_run",
+    "isolate_worker_worktrees": false,
+    "pm_mode": "coordinator",
+    "reporting": "worker_to_reviewer_to_pm"
+  },
+  "roles": [
+    {
+      "id": "editor",
+      "title": "Managing Editor",
+      "mode": "reviewer",
+      "profile": "reviewer",
+      "focus": "Editorial standards, voice, factual claims and quality",
+      "enabled": true
+    },
+    {
+      "id": "writer",
+      "title": "Content Writer",
+      "mode": "worker",
+      "profile": "implementer",
+      "focus": "Research-backed drafts with source attribution",
+      "enabled": true
+    }
+  ]
+}

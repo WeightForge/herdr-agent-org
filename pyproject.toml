@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "herdr-agent-org"
+version = "0.2.1"
+description = "Reusable, profile-aware AI organizations for Herdr App and herdr-core"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Community contributors" }]
+keywords = ["herdr", "claude-code", "codex", "ai-agents", "orchestration", "skills"]
+classifiers = ["Programming Language :: Python :: 3", "Operating System :: OS Independent"]
+dependencies = []
+
+[project.scripts]
+agentorg = "agentorg.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+agentorg = ["data/*.json", "data/skills/*/SKILL.md"]

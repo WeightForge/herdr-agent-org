@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "project_id": "change-me",
+  "kind": "research",
+  "human_approval": {
+    "publish": true,
+    "significant_spend": true,
+    "external_data_transfer": true
+  },
+  "policies": {
+    "max_parallel_workers": 2,
+    "default_mode": "dry_run",
+    "isolate_worker_worktrees": false,
+    "pm_mode": "coordinator",
+    "reporting": "worker_to_reviewer_to_pm"
+  },
+  "roles": [
+    {
+      "id": "principal-investigator",
+      "title": "Scientific Reviewer",
+      "mode": "reviewer",
+      "profile": "reviewer",
+      "focus": "Research questions, methodology, evidence and validity",
+      "enabled": true
+    },
+    {
+      "id": "research-worker",
+      "title": "Research Analyst",
+      "mode": "worker",
+      "profile": "implementer",
+      "focus": "Literature, experiments, reproducibility, analysis",
+      "enabled": true
+    }
+  ]
+}
