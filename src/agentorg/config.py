@@ -9,7 +9,7 @@ from importlib.resources import files
 from pathlib import Path
 
 ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
-PROVIDERS = {"claude", "codex"}
+PROVIDERS = {"claude", "codex", "antigravity"}
 ROLE_MODES = {"worker", "reviewer", "researcher", "observer"}
 
 
@@ -36,7 +36,7 @@ def read_json(path: Path, *, default=None):
             return default
         raise OrgError(f"Missing file: {path}")
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise OrgError(f"Invalid JSON in {path}: {exc}") from exc
 
@@ -86,7 +86,10 @@ def project_file(root: Path) -> Path:
 
 
 def load_project(root: Path) -> dict:
-    doc = read_json(project_file(root))
+    return validate_project(read_json(project_file(root)))
+
+
+def validate_project(doc) -> dict:
     if not isinstance(doc, dict) or doc.get("schema_version") != 2:
         raise OrgError("TEAM.json requires schema_version: 2")
     validate_id(doc.get("project_id"), "project_id")
@@ -124,6 +127,8 @@ def load_project(root: Path) -> dict:
             continue
         if role.get("mode") != "worker":
             raise OrgError(f"Role {role['id']}: reviewer_role is only valid on worker roles")
+        if not role.get("enabled", True):
+            continue  # a disabled worker may keep a stale route
         reviewer = by_id.get(reviewer_id)
         if reviewer is None or reviewer.get("mode") != "reviewer" or not reviewer.get("enabled", True):
             raise OrgError(f"Role {role['id']}: reviewer_role must name an enabled reviewer role")

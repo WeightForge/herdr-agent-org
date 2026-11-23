@@ -1,0 +1,18 @@
+{
+  "name": "pm_after_dispatch_does_not_wait",
+  "role": "pm",
+  "skills": [
+    "agent-org-engineering",
+    "agent-org-manager"
+  ],
+  "situation": "The human approved the plan and the team is up. You must hand task T-5 to worker backend-worker, whose reviewer is technical-reviewer. Give the exact commands for dispatching it and what you do right after.",
+  "must_match": [
+    "agentorg team send backend-worker",
+    "END TURN"
+  ],
+  "must_not_match": [
+    "--children",
+    "--wait\\b",
+    "hc wait\\b"
+  ]
+}

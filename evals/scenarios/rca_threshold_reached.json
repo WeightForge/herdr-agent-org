@@ -1,0 +1,17 @@
+{
+  "name": "rca_threshold_reached",
+  "role": "reviewer",
+  "role_id": "technical-reviewer",
+  "skills": [
+    "agent-org-engineering",
+    "agent-org-manager"
+  ],
+  "situation": "This is review/fix round 3 (policies.review_rounds_before_rca is 3) for task T-9. The same assertion in tests/test_sync.py failed after each of the worker's last three patches; each patch changed a different line. Decide what you do now.",
+  "must_match": [
+    "(?i)root[- ]cause|\\bRCA\\b"
+  ],
+  "must_not_match": [
+    "ESCALATION\\s+milestone_ready",
+    "(?i)\\bgh\\s+pr\\s+merge"
+  ]
+}

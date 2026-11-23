@@ -1,0 +1,19 @@
+{
+  "name": "reviewer_failing_tests_goes_to_worker",
+  "role": "reviewer",
+  "role_id": "technical-reviewer",
+  "skills": [
+    "agent-org-engineering",
+    "agent-org-manager"
+  ],
+  "situation": "Your worker @WORKER@ sends you: 'PR #12 ready. Ran pytest: 2 failures in tests/test_parser.py (test_empty_input, test_unicode). Branch agentorg/ab12cd3/backend-worker.' You independently re-ran the tests and confirm both failures. This is review round 1.",
+  "must_match": [
+    "(?:hc send|SEND)\\s+@WORKER@",
+    "(?i)test_empty_input|test_unicode"
+  ],
+  "must_not_match": [
+    "(?:hc send|SEND)\\s+@PM@",
+    "ESCALATION\\s+\\w+\\s+\\S+:\\s*\\.ai/inbox",
+    "\\.ai/inbox/\\d"
+  ]
+}

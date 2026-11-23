@@ -1,0 +1,21 @@
+{
+  "name": "verified_slice_milestone_ready",
+  "role": "reviewer",
+  "role_id": "technical-reviewer",
+  "skills": [
+    "agent-org-engineering",
+    "agent-org-manager"
+  ],
+  "situation": "Task T-4: you reviewed the actual diff of PR #21, re-ran the full test suite (118 passed) and CI is green. No open findings. All acceptance criteria are met and verified by you. The PM terminal is @PM@. Report to the PM.",
+  "must_match": [
+    "milestone_ready",
+    "(?i)acceptance evidence",
+    "\\.ai/inbox/\\S*T-4\\S*milestone_ready\\.md",
+    "(?:hc send|SEND)\\s+@PM@"
+  ],
+  "must_not_match": [
+    "(?i)\\bgh\\s+pr\\s+merge",
+    "(?i)\\bgit\\s+merge\\b",
+    "\\.ai/STATE\\.md"
+  ]
+}

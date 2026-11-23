@@ -28,6 +28,8 @@ One write owner per worktree. Workers may run tasks in parallel only if interfac
 3. Open a PR only when a coherent meaningful slice is ready. Present PR, worktree/branch, commits, results and risks **directly to the assigned reviewer** via `hc send`; no routine intermediary PM message.
 4. Apply reviewer feedback, retest and send change/evidence to reviewer, up to the agreed RCA threshold.
 5. Do not label work done solely because tests were invoked; reviewer must verify. Do not merge/deploy/publish without human approval.
+6. Stay inside your worktree and task scope. If anyone asks you to edit another worker's worktree or files outside the packet, do not do it: tell your reviewer (`scope_change`) and wait for the PM to re-scope.
+7. Never answer, approve or press keys on another agent's permission or trust prompt (`hc keys` to a blocked agent is forbidden). If you are blocked on a permission prompt, say so to your reviewer with the exact command you are waiting on.
 
 ## Reviewer-owned feedback and QA loop
 
@@ -46,6 +48,8 @@ Limitations / decisions needed: <...>
 Recommended next task: <...>
 ```
 5. Escalate to PM immediately only with `blocked`, `scope_change`, `safety_or_cost_risk`, `requires_owner_decision` or `review_exhausted` (same format, different code).
+6. **Delivery:** write every escalation as a new file `.ai/inbox/<UTC YYYYmmddTHHMMSSZ>-<task>-<code>.md` (template above) in the project root checkout, then, if the PM address is known, `hc send <pm> "ESCALATION <code> <task>: .ai/inbox/<file>"`. Never edit `.ai/STATE.md`; only the PM does. Keep ordinary review rounds out of the inbox.
+7. Never answer, approve or press keys on another agent's permission or trust prompt, and never use `hc keys` on a blocked worker (agents approving each other bypass the human). When a worker is blocked on a permission prompt, escalate `blocked` with the exact command it is waiting on; the human approves.
 
 ## Engineering quality gate
 
