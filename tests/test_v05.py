@@ -31,15 +31,21 @@ class ProtocolCopyTest(Fixture):
         self.assertEqual(runtime.install_protocol(self.project), "updated")
         self.assertIn("Protocol version: 1", self.dest().read_text(encoding="utf-8"))
 
-    def test_edited_same_or_newer_version_is_kept_with_warning(self):
+    def test_same_version_text_change_is_refreshed(self):
         self.init()
-        for text in (PACKAGED.read_text(encoding="utf-8") + "\nlocal edit\n", "# mine\n\nProtocol version: 9\n"):
-            self.dest().write_text(text, encoding="utf-8")
-            err = io.StringIO()
-            with contextlib.redirect_stderr(err):
-                self.assertEqual(runtime.install_protocol(self.project), "kept")
-            self.assertEqual(self.dest().read_text(encoding="utf-8"), text)
-            self.assertIn("WARNING", err.getvalue())
+        self.dest().write_text(PACKAGED.read_text(encoding="utf-8") + "\nstale or edited\n", encoding="utf-8")
+        self.assertEqual(runtime.install_protocol(self.project), "updated")
+        self.assertEqual(self.dest().read_text(encoding="utf-8"), PACKAGED.read_text(encoding="utf-8"))
+
+    def test_newer_version_is_kept_with_warning(self):
+        self.init()
+        text = "# mine\n\nProtocol version: 9\n"
+        self.dest().write_text(text, encoding="utf-8")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(runtime.install_protocol(self.project), "kept")
+        self.assertEqual(self.dest().read_text(encoding="utf-8"), text)
+        self.assertIn("WARNING", err.getvalue())
 
     def test_team_up_apply_installs_protocol_but_plan_does_not(self):
         self.init()

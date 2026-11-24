@@ -56,7 +56,7 @@ Precedence when deriving: `cancelled`, then `reassigned`, then the `State:` line
 
 Dependencies: if the packet has `blocked_by: <task id>`, the reviewer keeps the task `acknowledged` with `Waiting-on: <id>` and does not release the worker until the prerequisite's `progress.md` says `State: done`. It then records the accepted prerequisite commit, removes `Waiting-on`, and tells the worker to go ahead; the worker `ACK`s and the task becomes `started`. This go-ahead is the only case where the worker waits after reading a packet: a packet without an unresolved `blocked_by` is started right after the `ACK`. The PM is not woken.
 
-Cancellation: the PM writes `.ai/tasks/<id>/cancel` and sends the reviewer and the worker its absolute path once. Both stop work on the task at once. The worker commits nothing further; the reviewer does not escalate it.
+Cancellation: the PM writes `.ai/tasks/<id>/cancel` and sends the reviewer and the worker its absolute path once. Both stop work on the task at once. The worker commits nothing further; the reviewer does not escalate it. Commits already made for the task stay on the worker branch and are not accepted: the reviewer records them in `progress.md` as `Cancelled-commits: <sha> ...` so the owner can drop them before merging, and later handoffs on that branch must name them.
 
 Reassignment: the PM never edits the packet. It writes `.ai/tasks/<id>/reassign.md` with `Revision: <n>`, `Worker: <role>`, `Reviewer: <role>` and a reason, then sends the new owners the packet path and the reassign path. The old worker stops. The reviewer records `Reassign-ack: <n>`, sets `State: acknowledged`, and waits for the new worker's `ACK`.
 
