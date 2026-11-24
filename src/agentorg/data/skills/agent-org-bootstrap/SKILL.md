@@ -25,7 +25,7 @@ Goal: the owner asks once, answers exactly one question, and the team is running
 
 - Give every role a domain-specific `title` and `focus` taken from what the project is. Pair each worker with a reviewer (`--reviewer-role`).
 - Default size is small: one reviewer and one worker. Add a second pair only when the project clearly needs it. Maximum two pairs on first setup.
-- Assign accounts from the detected profiles. Prefer accounts other than the PM's when possible, and put workers on the account with the most headroom if the owner said which. Do not invent model names: leave model and effort unset (CLI default) unless the owner specified them.
+- Assign accounts from the detected profiles. Your own (PM) account is the directory in `CLAUDE_CONFIG_DIR` (Claude Code) or `CODEX_HOME` (Codex), or the default `~/.claude` / `~/.codex` when unset. Prefer accounts other than the PM's when possible, and put workers on the account with the most headroom if the owner said which. Do not invent model names: leave model and effort unset (CLI default) unless the owner specified them.
 - Choose the role ids (lowercase, `-`), for example `ai-scientist`, `ai-engineer`.
 
 ### 3. Send ONE message
@@ -44,7 +44,7 @@ Ask nothing else, and never ask for tokens, emails or passwords. If the owner as
 The owner's "yes" is the launch approval for this setup only. It is not permission to merge, release, deploy or spend.
 
 1. `agentorg profile detect --add` registers the detected accounts that are not registered yet (it skips an alias already used by a different profile; report that).
-2. Shape the team: for each proposed role `agentorg role add <id> --mode reviewer|worker --title "..." --focus "..." --profile <alias> [--reviewer-role <id>] [--model ...] [--effort ...]`. Remove template roles that are not part of the team with `agentorg role remove <id>` (remove the worker before its reviewer), or adapt one with `agentorg role set <id> --title ... --focus ... --profile ...`. Titles and focus must not contain `" % & | < > ^`.
+2. Shape the team: for each proposed role `agentorg role add <id> --mode reviewer|worker --title "..." --focus "..." --profile <alias> [--reviewer-role <id>] [--model ...] [--effort ...]`. Add the new roles first, then remove template roles that are not part of the team with `agentorg role remove <id>` (a team always keeps at least one role; remove the worker before its reviewer), or adapt one with `agentorg role set <id> --title ... --focus ... --profile ...`. Titles and focus must not contain `" % & | < > ^`.
 3. Write `.ai/PROJECT.md` and `.ai/ROADMAP.md` from project evidence; template placeholders are not requirements.
 4. `agentorg doctor`, then `agentorg team plan`. Fix any reported issue before continuing.
 5. Commit only `.ai/TEAM.json`, `.ai/PROTOCOL.md`, `.ai/PROJECT.md`, `.ai/ROADMAP.md`, `.ai/STATE.md`, `.ai/DECISIONS.md`, `.ai/.gitignore` and `QUESTION.md` (worktrees branch from `HEAD`).

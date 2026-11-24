@@ -121,13 +121,14 @@ agentorg profile add reviewer    --provider claude --model opus   --effort mediu
 agentorg profile add implementer --provider claude --model sonnet --effort high
 
 # The engineering template ships two reviewer/worker pairs as a starting point.
-# Replace them with roles that have real titles for your project:
+# Replace them with roles that have real titles for your project
+# (add first: a team must always keep at least one role; remove a worker before its reviewer):
+agentorg role add ai-scientist --mode reviewer --title "Senior AI Scientist" --focus "Evaluation design and method review" --profile reviewer
+agentorg role add ai-engineer  --mode worker   --title "Senior AI Engineer" --focus "Training and serving pipelines" --profile implementer --reviewer-role ai-scientist
 agentorg role remove frontend-worker
 agentorg role remove design-reviewer
 agentorg role remove backend-worker
 agentorg role remove technical-reviewer
-agentorg role add ai-scientist --mode reviewer --title "Senior AI Scientist" --focus "Evaluation design and method review" --profile reviewer
-agentorg role add ai-engineer  --mode worker   --title "Senior AI Engineer" --focus "Training and serving pipelines" --profile implementer --reviewer-role ai-scientist
 # Adjust later: agentorg role set ai-engineer --title "..." --focus "..." --profile NAME
 
 agentorg doctor                        # executables and directories only; not live auth
