@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from .config import OrgError, read_json, write_json, org_home, load_project, load_profiles, resolve_profile, resolve_role
+from .config import check_safe_text, OrgError, read_json, write_json, org_home, load_project, load_profiles, resolve_profile, resolve_role
 
 
 ESCALATION_CODES = ("milestone_ready", "blocked", "requires_owner_decision", "scope_change",
@@ -281,7 +281,12 @@ def install_protocol(project: Path) -> str:
 
 def _field(text: str, name: str) -> str | None:
     m = re.search(rf"^{name}:[ \t]*(\S+)", text, re.M | re.I)
-    return m.group(1).lower() if m else None
+    return m.group(1).rstrip(".,;") if m else None
+
+
+def _num(text: str, name: str) -> int:
+    m = re.search(rf"^{name}:[ \t]*(\d+)", text, re.M | re.I)  # junk like "two" counts as 0; status must never crash
+    return int(m.group(1)) if m else 0
 
 
 def _read(path: Path) -> str:
@@ -306,16 +311,16 @@ def task_states(project: Path) -> list[dict]:
         flags = []
         if (d / "cancel").exists():
             state, nxt = "cancelled", "none"
-        elif (d / "reassign.md").exists() and int(_field(_read(d / "reassign.md"), "Revision") or 0) > int(_field(progress or "", "Reassign-ack") or 0):
+        elif (d / "reassign.md").exists() and _num(_read(d / "reassign.md"), "Revision") > _num(progress or "", "Reassign-ack"):
             state, nxt = "reassigned", "reviewer"
         elif progress is None:
             state, nxt = "dispatched", "reviewer"
         else:
-            state = _field(progress, "State") or "unknown"
+            state = (_field(progress, "State") or "unknown").lower()
             nxt = {"acknowledged": "worker", "started": "worker", "in_review": "reviewer", "done": "pm", "blocked": "pm"}.get(state, "unknown")
             if state == "acknowledged":
-                dep_done = dep in rows and _field(rows[dep][1] or "", "State") == "done"
-                if _field(progress, "Waiting-on") or (dep and dep != "none" and not dep_done):
+                dep_done = dep in rows and (_field(rows[dep][1] or "", "State") or "").lower() == "done"
+                if _field(progress, "Waiting-on") or (dep and dep.lower() != "none" and not dep_done):
                     flags.append("waiting_on_dependency")
                     nxt = "reviewer"
                 else:
@@ -389,6 +394,8 @@ def stop_team(project: Path, *, apply: bool = False, remove_worktrees: bool = Fa
 def make_agent_prompt(project: Path, role: dict, pm: str | None = None) -> str:
     """First provider prompt: a short role summary; PROTOCOL.md is the single source of the rules."""
     doc = load_project(project)
+    protocol_path = str((project / ".ai" / "PROTOCOL.md").resolve())
+    check_safe_text(protocol_path, "Project path (it is embedded in the launch prompt)")
     reviewer_id = role.get("reviewer_role") if role.get("mode") == "worker" else None
     route = ""
     if reviewer_id:
@@ -407,7 +414,7 @@ def make_agent_prompt(project: Path, role: dict, pm: str | None = None) -> str:
                     "PM is outside Herdr: do not send anything; the PM reads the inbox when it next wakes. "))
     return (f"You are {role.get('title', role['id'])} (role {role['id']}) in project {doc['project_id']}. "
             f"Focus: {role.get('focus', '')}. "
-            f"Read {(project / '.ai' / 'PROTOCOL.md').resolve()} before acting; it is authoritative for file layout, task states and escalations. "
+            f"Read {protocol_path} before acting; it is authoritative for file layout, task states and escalations. "
             "Also read `hc --skill` and the project's .ai/PROJECT.md, .ai/TEAM.json, .ai/ROADMAP.md and .ai/STATE.md, if available. "
             "You are a team member, not the PM. Do not spawn other agents unless the PM explicitly delegates that authority. "
             "Do not publish, merge, deploy, spend money, or change external services without human permission. "

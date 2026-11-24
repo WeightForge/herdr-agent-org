@@ -111,6 +111,30 @@ class TaskStateTest(Fixture):
         self.task("e", progress_md="State: done\n")
         self.assertEqual(self.states()["d"]["flags"], ["unknown_delivery"])  # dependency released, worker never acked
 
+    def test_dependency_release_with_uppercase_ids(self):
+        self.init()
+        self.task("T1", progress_md="State: Done\n")
+        self.task("T2", packet="TASK T2\nblocked_by: T1,\n", progress_md="State: acknowledged\n")
+        self.assertEqual(self.states()["T2"]["flags"], ["unknown_delivery"])
+        self.task("T1", progress_md="State: in_review\n")
+        self.assertEqual(self.states()["T2"]["flags"], ["waiting_on_dependency"])
+
+    def test_junk_in_agent_written_files_never_crashes_status(self):
+        self.init()
+        self.task("a", progress_md="State: started\nReassign-ack: many\n", reassign_md="Revision: two\n")
+        self.task("b", progress_md="State: started\nReassign-ack: \x00??\n", reassign_md="Revision: 3x\n")
+        s = self.states()
+        self.assertEqual(s["a"]["state"], "started")
+        self.assertEqual(s["b"]["state"], "reassigned")  # "3x" parses as 3 > 0
+
+    def test_prompt_rejects_unsafe_project_path(self):
+        self.init()
+        role = config.load_project(self.project)["roles"][0]
+        bad = self.project.parent / "100%demo"
+        with patch.object(Path, "resolve", lambda self_: bad / self_.name if self_.name == "PROTOCOL.md" else self_):
+            with self.assertRaisesRegex(config.OrgError, "Project path"):
+                runtime.make_agent_prompt(self.project, role)
+
     def test_no_tasks_dir_is_empty(self):
         self.init()
         self.assertEqual(runtime.task_states(self.project), [])
