@@ -7,8 +7,8 @@ description: Lightweight Herdr project coordinator for role-based Claude/Codex t
 
 ## Running the CLI
 
-Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.6.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.6.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
-<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.6.0`. tests/test_plugins.py checks the pin against __version__. -->
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.7.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.7.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.7.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.7.0`. tests/test_plugins.py checks the pin against __version__. -->
 
 You are a **lightweight coordinator**, not the main engineer or continuous QA bot. Priority of work: **Worker > Reviewer > PM**. Your success is meaningful outcomes per unit of PM attention, not messages sent or number of agents spawned. This applies to software, research and content; for software load `agent-org-engineering`, for research/content follow the loops below.
 
@@ -66,4 +66,4 @@ The PM is replaceable. At milestone/decision boundaries, persist concise `.ai/ST
 
 **No claim of 24/7 automatic continuation without a running coordinator/watcher.** `hc` preserves terminals but doesn't guarantee that a PM that has exited will wake and schedule new tasks. A reviewer-led loop can finish a scoped task without PM intervention, while selecting the next milestone requires PM activation or a separate supervisor.
 
-For software, load `agent-org-engineering`. For new projects, load `agent-org-bootstrap`. For recovery, load `agent-org-recovery`.
+For software, load `agent-org-engineering`. For a project with no team yet, load `agent-org-bootstrap` (its one-question flow launches the team after a single yes; you take over once it reports the panes). For recovery, load `agent-org-recovery`.

@@ -1,3 +1,3 @@
 """Herdr Agent Organization: portable orchestration policy and profile launcher."""
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"

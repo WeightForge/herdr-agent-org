@@ -39,6 +39,8 @@ def add_parser() -> argparse.ArgumentParser:
     add.add_argument("--effort")
     add.add_argument("--replace", action="store_true", help="Explicitly replace existing profile")
     ps.add_parser("list")
+    det = ps.add_parser("detect", help="Find logged-in Claude/Codex config dirs and Antigravity (existence checks only; reads no file contents)")
+    det.add_argument("--add", action="store_true", help="Register every detected, unregistered entry whose command is found")
     delete = ps.add_parser("remove")
     delete.add_argument("name")
 
@@ -50,6 +52,8 @@ def add_parser() -> argparse.ArgumentParser:
     setrole.add_argument("--profile")
     setrole.add_argument("--model")
     setrole.add_argument("--effort")
+    setrole.add_argument("--title", help="Job title fitted to the project, e.g. 'Senior AI Scientist'")
+    setrole.add_argument("--focus", help="What this role concentrates on in this project")
     routes = setrole.add_mutually_exclusive_group()
     routes.add_argument("--reviewer-role", help="Reviewer role for a worker (direct Worker → Reviewer reporting)")
     routes.add_argument("--clear-reviewer-role", action="store_true")
@@ -57,6 +61,19 @@ def add_parser() -> argparse.ArgumentParser:
     group.add_argument("--enable", action="store_true")
     group.add_argument("--disable", action="store_true")
     rs.add_parser("list").add_argument("--path", default=".")
+    addrole = rs.add_parser("add", help="Add a role with a real job title; mode is only its level")
+    addrole.add_argument("role", help="Role id, e.g. ai-scientist")
+    addrole.add_argument("--mode", choices=("reviewer", "worker"), required=True)
+    addrole.add_argument("--title", required=True)
+    addrole.add_argument("--focus", required=True)
+    addrole.add_argument("--profile", required=True)
+    addrole.add_argument("--reviewer-role", help="Reviewer role for a worker")
+    addrole.add_argument("--model")
+    addrole.add_argument("--effort")
+    addrole.add_argument("--path", default=".")
+    rmrole = rs.add_parser("remove")
+    rmrole.add_argument("role")
+    rmrole.add_argument("--path", default=".")
 
     q = sub.add_parser("team", help="Plan, launch and monitor Herdr team")
     ts = q.add_subparsers(dest="op", required=True)
@@ -135,6 +152,8 @@ def profile_cmd(ns):
             safe[name] = {k: v for k, v in item.items() if k in ("provider", "command", "model", "effort", "native_profile", "config_dir")}
         print(json.dumps({"profile_file": str(profiles_path()), "profiles": safe}, indent=2))
         return
+    if ns.op == "detect":
+        return detect_cmd(ns, profiles)
     validate_id(ns.name, "profile name")
     if ns.op == "remove":
         if ns.name not in profiles:
@@ -145,28 +164,90 @@ def profile_cmd(ns):
         return
     if ns.name in profiles and not ns.replace:
         raise OrgError(f"Profile '{ns.name}' exists; use --replace to update it")
-    if ns.native_profile and ns.provider != "codex":
+    profiles[ns.name] = build_profile(ns.provider, ns.executable, ns.config_dir, ns.native_profile, ns.model, ns.effort)
+    save_profiles(profiles)
+    print(f"Saved local-only profile '{ns.name}' at {profiles_path()} (no tokens stored).")
+
+
+def build_profile(provider, executable, config_dir, native_profile, model, effort) -> dict:
+    """Validate and build one profile record (shared by `profile add` and `profile detect --add`)."""
+    if native_profile and provider != "codex":
         raise OrgError("--native-profile is supported for Codex only")
-    if ns.provider == "antigravity" and ns.config_dir:
+    if provider == "antigravity" and config_dir:
         raise OrgError("--config-dir is not supported for antigravity")
-    for opt in ("model", "effort", "native_profile"):
-        if getattr(ns, opt):
-            check_safe_text(getattr(ns, opt), "--" + opt.replace("_", "-"))
-    config_dir = None
-    if ns.config_dir:
-        path = Path(ns.config_dir).expanduser().resolve()
+    for opt, value in (("model", model), ("effort", effort), ("native-profile", native_profile)):
+        if value:
+            check_safe_text(value, "--" + opt)
+    resolved = None
+    if config_dir:
+        path = Path(config_dir).expanduser().resolve()
         if not path.is_dir():
             raise OrgError(f"Config directory does not exist: {path}")
-        config_dir = str(path)
-    command = ns.executable or ("agy" if ns.provider == "antigravity" else ns.provider)
+        resolved = str(path)
+    command = executable or ("agy" if provider == "antigravity" else provider)
     if not command or any(ch in command for ch in ("\n", "\r", "\0")):
         raise OrgError("Invalid executable command")
     if not which(command):
         raise OrgError(f"Executable not found: {command}. Use an installed CLI or full path to wrapper executable.")
-    profiles[ns.name] = {"provider": ns.provider, "command": command, "config_dir": config_dir,
-                         "native_profile": ns.native_profile, "model": ns.model, "effort": ns.effort}
-    save_profiles(profiles)
-    print(f"Saved local-only profile '{ns.name}' at {profiles_path()} (no tokens stored).")
+    return {"provider": provider, "command": command, "config_dir": resolved,
+            "native_profile": native_profile, "model": model, "effort": effort}
+
+
+# (provider, default dir name, marker files/dirs; any one is enough)
+_DETECT = (("claude", ".claude", ("settings.json", ".credentials.json", "projects")),
+           ("codex", ".codex", ("config.toml", "auth.json")))
+
+
+def detect_profiles(profiles: dict) -> list:
+    """Existence checks only: no file under a config dir is ever opened."""
+    home = Path.home()
+    found = []
+    for provider, base, markers in _DETECT:
+        for entry in sorted(home.glob(base + "*"), key=lambda p: p.name):
+            if entry.name != base and not entry.name.startswith(base + "-"):
+                continue
+            if not entry.is_dir() or not any((entry / m).exists() for m in markers):
+                continue
+            default = entry.name == base
+            found.append({"alias": entry.name.lstrip("."), "provider": provider, "_dir": entry.resolve(), "_default": default,
+                          "config_dir": None if default else str(entry.resolve())})
+    if which("agy"):
+        found.append({"alias": "antigravity", "provider": "antigravity", "config_dir": None, "_dir": None, "_default": True})
+    for item in found:
+        item["command_found"] = bool(which("agy" if item["provider"] == "antigravity" else item["provider"]))
+        item["registered_as"] = None
+        for name, prof in profiles.items():
+            cfg = prof.get("config_dir")
+            # A default dir is matched by a null config_dir or by a profile pointing at that dir explicitly.
+            same = (cfg is None and item["_default"]) or (cfg is not None and item["_dir"] is not None and Path(cfg).resolve() == item["_dir"])
+            if prof.get("provider") == item["provider"] and same:
+                item["registered_as"] = name
+                break
+    return found
+
+
+def detect_cmd(ns, profiles):
+    found = detect_profiles(profiles)
+    out = {"profiles": [{k: v for k, v in i.items() if not k.startswith("_")} for i in found]}
+    if ns.add:
+        added, skipped = [], []
+        for item in found:
+            alias = item["alias"]
+            if item["registered_as"] or not item["command_found"]:
+                continue
+            try:
+                validate_id(alias, "profile alias")
+                if alias in profiles:
+                    raise OrgError(f"alias '{alias}' is already used by a different profile")
+                profiles[alias] = build_profile(item["provider"], None, item["config_dir"], None, None, None)
+                added.append(alias)
+            except OrgError as exc:
+                skipped.append({"alias": alias, "reason": str(exc)})
+        if added:
+            save_profiles(profiles)
+        out["added"] = added
+        out["skipped"] = skipped
+    print(json.dumps(out, indent=2))
 
 
 def role_cmd(ns):
@@ -175,10 +256,39 @@ def role_cmd(ns):
     if ns.op == "list":
         print(json.dumps(doc["roles"], indent=2))
         return
+    if ns.op == "add":
+        validate_id(ns.role, "role id")
+        validate_id(ns.profile, "profile alias")
+        if any(r["id"] == ns.role for r in doc["roles"]):
+            raise OrgError(f"Role '{ns.role}' already exists; use role set to change it")
+        for opt in ("title", "focus"):
+            if not getattr(ns, opt).strip():
+                raise OrgError(f"--{opt} must not be empty")
+        role = {"id": ns.role, "title": ns.title, "mode": ns.mode, "profile": ns.profile, "focus": ns.focus, "enabled": True}
+        for opt in ("model", "effort"):
+            if getattr(ns, opt):
+                role[opt] = getattr(ns, opt)
+        if ns.reviewer_role:
+            role["reviewer_role"] = ns.reviewer_role
+        doc["roles"].append(role)
+    elif ns.op == "remove":
+        resolve_role(doc, ns.role)
+        users = [r["id"] for r in doc["roles"] if r.get("enabled", True) and r.get("reviewer_role") == ns.role]
+        if users:
+            raise OrgError(f"Cannot remove {ns.role}: enabled worker(s) {', '.join(users)} route to it. Re-route or remove them first.")
+        doc["roles"] = [r for r in doc["roles"] if r["id"] != ns.role]
+    if ns.op in ("add", "remove"):
+        validate_project(doc)
+        write_json(project_file(root), doc)
+        print(f"{'Added' if ns.op == 'add' else 'Removed'} role {ns.role} in {project_file(root)}")
+        return
     role = resolve_role(doc, ns.role)
-    for opt in ("model", "effort"):
+    for opt in ("model", "effort", "title", "focus"):
         if getattr(ns, opt):
             check_safe_text(getattr(ns, opt), f"--{opt}")
+    for opt in ("title", "focus"):
+        if getattr(ns, opt):
+            role[opt] = getattr(ns, opt)
     if ns.profile:
         validate_id(ns.profile, "profile alias")
         role["profile"] = ns.profile
