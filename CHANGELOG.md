@@ -1,3 +1,10 @@
+## 0.7.0 - one-question team setup
+- `agent-org-bootstrap` is rewritten around one question: the PM reads the repo, detects accounts, and sends one proposal (accounts, team table, PROJECT/ROADMAP summary); after a single "yes" it configures, commits `.ai/` and runs `team up --apply`.
+- `agentorg profile detect [--add]`: finds `~/.claude`, `~/.claude-*`, `~/.codex`, `~/.codex-*` and `agy` by existence checks only (no file is opened). The default dirs are stored as `config_dir: null`; `--add` skips an alias already used by a different profile.
+- `agentorg role add` / `role remove`, and `role set --title/--focus`: every agent has a real job title and focus fitted to the project; `mode` is only its level.
+- `docs/maintainers/CODEX_HANDOFF.md` rewritten as a current handoff.
+- Mock-tested only; live testing is pending.
+
 ## 0.6.0 - plugins
 - Installable as a plugin for Claude Code, Codex and Antigravity: manifests live in `src/agentorg/data/` (the plugin root, next to the single canonical `skills/` copy); marketplaces at `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`.
 - Skills resolve the CLI once: `agentorg` if on `PATH`, else `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg`.

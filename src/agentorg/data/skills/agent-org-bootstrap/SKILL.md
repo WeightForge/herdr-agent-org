@@ -1,22 +1,55 @@
 ---
 name: agent-org-bootstrap
-description: Initialize an AI organization for an existing software, research or content project: select team roles and configure local provider profiles (requires the agentorg CLI and Herdr `hc`). Use when a user says to start a new AI team, set up a PM and roles for a repository, or run `agentorg init`.
+description: Set up an AI team for an existing project with one question: detect accounts, propose a team with real job titles, then configure and launch it after a single yes (requires the agentorg CLI and Herdr `hc`). Use when a user says "set up a team for this project", wants to start a new AI team, or runs `agentorg init`.
 ---
 
 # Agent Organization — Bootstrap
 
 ## Running the CLI
 
-Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.6.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.6.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
-<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.6.0`. tests/test_plugins.py checks the pin against __version__. -->
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.7.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.7.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.7.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.7.0`. tests/test_plugins.py checks the pin against __version__. -->
 
-1. Inspect README, docs, current repo, legal/privacy needs and user request. Do not invent product specifics or overwrite existing docs.
-2. Resolve the CLI as described above. For the selected domain, run `agentorg init --template engineering|research|content --path <project>`; this creates only missing files.
-3. Populate `.ai/PROJECT.md` and `.ai/ROADMAP.md` based on project evidence and owner constraints; template placeholders are **not** validated product requirements.
-4. Team config lives in `.ai/TEAM.json`; profile aliases live **outside Git** in the local user profile store. Check `agentorg profile list` then guide the user through `agentorg profile add <alias> --provider claude|codex|antigravity ...`. For CLI-authenticated accounts `--config-dir` selects `CLAUDE_CONFIG_DIR` or `CODEX_HOME`; do not ask for tokens/emails.
-5. Use `agentorg role set <role> --profile <alias> [--model ...] [--effort ...]` to assign exact providers. Run `agentorg doctor` and `agentorg team plan`; verify actual local model availability and corporate policy.
-6. For software worktrees commit the generated `.ai/TEAM.json`, `.ai/PROTOCOL.md` and project docs before `agentorg team up --apply` so new worktrees contain the shared instructions. Explicit permission to launch the team is required. Preview is safe and side-effect-free with respect to Herdr and worktrees.
-7. Load `agent-org-manager` and add domain loop. On PM restart use `agent-org-recovery` rather than rebuilding from scratch.
+## One-question flow
+
+Goal: the owner asks once, answers exactly one question, and the team is running. Roles have a real job title and focus fitted to the project (for example "Senior AI Scientist", "Senior Fullstack Developer", "Senior UX Designer"). `mode` (`reviewer` or `worker`) is only the agent's level; never use "reviewer" or "worker" as the title. The template roles are a starting point, not the answer.
+
+### 1. Prepare silently (no questions, no launches)
+
+- Read the repo: README, docs, manifests, code layout, tests, existing `.ai/`. Do not invent product specifics or overwrite existing docs.
+- Resolve the CLI (above). Run `agentorg init --template engineering|research|content --path <project>` if `.ai/TEAM.json` is missing (it creates only missing files).
+- Run `agentorg profile detect`. It checks which Claude/Codex config directories and Antigravity exist and never reads their contents. Also run `agentorg profile list` and `agentorg doctor`.
+- Stop and ask only if something truly blocks: not a Git repository, no `hc`, no usable provider CLI.
+
+### 2. Design the team from project evidence
+
+- Give every role a domain-specific `title` and `focus` taken from what the project is. Pair each worker with a reviewer (`--reviewer-role`).
+- Default size is small: one reviewer and one worker. Add a second pair only when the project clearly needs it. Maximum two pairs on first setup.
+- Assign accounts from the detected profiles. Your own (PM) account is the directory in `CLAUDE_CONFIG_DIR` (Claude Code) or `CODEX_HOME` (Codex), or the default `~/.claude` / `~/.codex` when unset. Prefer accounts other than the PM's when possible, and put workers on the account with the most headroom if the owner said which. Do not invent model names: leave model and effort unset (CLI default) unless the owner specified them.
+- Choose the role ids (lowercase, `-`), for example `ai-scientist`, `ai-engineer`.
+
+### 3. Send ONE message
+
+Contents, in this order:
+
+1. Detected accounts (alias, provider, whether the command was found).
+2. The proposed team as a table: `Title | Level | Account | Focus`.
+3. Two or three lines on what `.ai/PROJECT.md` and `.ai/ROADMAP.md` will say.
+4. The single question: **Start this team, or tell me what to change?**
+
+Ask nothing else, and never ask for tokens, emails or passwords. If the owner asks for changes, update the proposal and ask the same single question again.
+
+### 4. After "yes"
+
+The owner's "yes" is the launch approval for this setup only. It is not permission to merge, release, deploy or spend.
+
+1. `agentorg profile detect --add` registers the detected accounts that are not registered yet (it skips an alias already used by a different profile; report that).
+2. Shape the team: for each proposed role `agentorg role add <id> --mode reviewer|worker --title "..." --focus "..." --profile <alias> [--reviewer-role <id>] [--model ...] [--effort ...]`. Add the new roles first, then remove template roles that are not part of the team with `agentorg role remove <id>` (a team always keeps at least one role; remove the worker before its reviewer), or adapt one with `agentorg role set <id> --title ... --focus ... --profile ...`. Titles and focus must not contain `" % & | < > ^`.
+3. Write `.ai/PROJECT.md` and `.ai/ROADMAP.md` from project evidence; template placeholders are not requirements.
+4. `agentorg doctor`, then `agentorg team plan`. Fix any reported issue before continuing.
+5. Commit only `.ai/TEAM.json`, `.ai/PROTOCOL.md`, `.ai/PROJECT.md`, `.ai/ROADMAP.md`, `.ai/STATE.md`, `.ai/DECISIONS.md`, `.ai/.gitignore` and `QUESTION.md` (worktrees branch from `HEAD`).
+6. `agentorg team up --apply`.
+7. Report the panes and terminals that started and hand over to `agent-org-manager`. On PM restart use `agent-org-recovery` rather than rebuilding from scratch.
 
 ## Unattended operation
 

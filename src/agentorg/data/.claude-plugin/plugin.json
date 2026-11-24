@@ -1,6 +1,6 @@
 {
   "name": "agent-org",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Reusable PM, reviewer and worker AI teams on Herdr: skills for bootstrap, manager, engineering and recovery, backed by the agentorg CLI.",
   "author": { "name": "Community contributors" },
   "homepage": "https://github.com/WeightForge/herdr-agent-org",

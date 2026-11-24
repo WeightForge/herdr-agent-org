@@ -75,12 +75,30 @@ git clone https://github.com/WeightForge/herdr-agent-org
 agy plugin install herdr-agent-org/src/agentorg/data
 ```
 
-Then ask your agent to bootstrap an organization for your project (`agent-org-bootstrap`), or run the CLI yourself:
+### Set up a team with one question
 
-```bash
-cd /path/to/your-project               # an existing Git repository
-agentorg init --template engineering --name my-project
+Open a PM session in your project (Claude Code, Codex or Antigravity with the plugin) and say:
+
+> Set up an agent team for this project.
+
+The PM reads your repo, detects the accounts you are logged in with (it only checks that config directories exist; it never reads credentials) and sends you one message with a complete proposal. Every agent gets a real job title and focus fitted to your project; "reviewer" or "worker" is only its level:
+
+```text
+Accounts found: claude (Claude Code), claude-work (Claude Code), codex (Codex)
+
+Proposed team
+| Title               | Level    | Account     | Focus                                          |
+|---------------------|----------|-------------|------------------------------------------------|
+| Senior AI Scientist | reviewer | claude-work | Evaluation design, data leakage, metric validity |
+| Senior AI Engineer  | worker   | codex       | Training and serving pipelines, tests          |
+
+PROJECT.md will describe the churn-prediction service and its latency limits;
+ROADMAP.md will start with a reproducible baseline, then the evaluation harness.
+
+Start this team, or tell me what to change?
 ```
+
+After one "yes" the PM registers the accounts, shapes `.ai/TEAM.json`, writes `PROJECT.md` and `ROADMAP.md`, runs `doctor` and `team plan`, commits `.ai/`, runs `team up --apply` and reports the panes. That "yes" approves launching this team only; merge, release, deploy and spend still need your own message.
 
 ### Manual / CLI-first
 
@@ -89,19 +107,29 @@ pip install herdr-agent-org
 agentorg install --target both        # skills for Claude Code and Codex (also: claude | codex | antigravity | all)
 ```
 
-Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg`.
+Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.7.0 agentorg`.
 
 Profiles are local aliases: an executable, an optional config directory (`--config-dir`, e.g. a separate `CLAUDE_CONFIG_DIR`) and a public model/effort. No key is stored. The CLI must already be installed and logged in.
 
 ```bash
+cd /path/to/your-project               # an existing Git repository
+agentorg init --template engineering --name my-project
+
+agentorg profile detect --add          # find ~/.claude, ~/.claude-*, ~/.codex, ~/.codex-*, agy; register them as aliases
+# or by hand:
 agentorg profile add reviewer    --provider claude --model opus   --effort medium
 agentorg profile add implementer --provider claude --model sonnet --effort high
 
-# The engineering template ships two reviewer/worker pairs bound to the aliases
-# reviewer, implementer, designer and frontend. This quickstart runs one pair:
-agentorg role set frontend-worker --disable
-agentorg role set design-reviewer --disable
-# To bind a role to a different alias: agentorg role set backend-worker --profile NAME
+# The engineering template ships two reviewer/worker pairs as a starting point.
+# Replace them with roles that have real titles for your project
+# (add first: a team must always keep at least one role; remove a worker before its reviewer):
+agentorg role add ai-scientist --mode reviewer --title "Senior AI Scientist" --focus "Evaluation design and method review" --profile reviewer
+agentorg role add ai-engineer  --mode worker   --title "Senior AI Engineer" --focus "Training and serving pipelines" --profile implementer --reviewer-role ai-scientist
+agentorg role remove frontend-worker
+agentorg role remove design-reviewer
+agentorg role remove backend-worker
+agentorg role remove technical-reviewer
+# Adjust later: agentorg role set ai-engineer --title "..." --focus "..." --profile NAME
 
 agentorg doctor                        # executables and directories only; not live auth
 agentorg team plan                     # dry run: exact argv and worktree paths
@@ -190,7 +218,10 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 | `agentorg init [--template engineering\|research\|content] [--name N]` | Create missing `.ai/` files and `.ai/PROTOCOL.md`; never overwrites |
 | `agentorg profile add NAME --provider claude\|codex\|antigravity [--config-dir D] [--model M] [--effort E] [--native-profile P] [--command EXE] [--replace]` | Save a local profile alias (no secrets) |
 | `agentorg profile list \| remove NAME` | Inspect or delete aliases |
-| `agentorg role set ROLE [--profile P] [--model M] [--effort E] [--reviewer-role R] [--enable\|--disable]` | Edit the team manifest (validated before write) |
+| `agentorg profile detect [--add]` | Find Claude/Codex config dirs and `agy` by existence checks only; `--add` registers new ones (default `~/.claude` and `~/.codex` are stored as `config_dir: null`) |
+| `agentorg role add ROLE --mode reviewer\|worker --title T --focus F --profile P [--reviewer-role R] [--model M] [--effort E]` | Add a role with a real job title; `mode` is only its level (validated before write) |
+| `agentorg role remove ROLE` | Remove a role; refused while an enabled worker routes to it |
+| `agentorg role set ROLE [--title T] [--focus F] [--profile P] [--model M] [--effort E] [--reviewer-role R] [--enable\|--disable]` | Edit the team manifest (validated before write) |
 | `agentorg role list` | Show roles |
 | `agentorg doctor` | Check Python, `hc`, `git`, provider CLIs and profile directories; no API calls |
 | `agentorg team plan` | Dry run: exact launch argv and worktree paths |
