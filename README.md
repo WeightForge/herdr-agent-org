@@ -1,158 +1,221 @@
-# Herdr Agent Organization (v0.2 preview)
+<div align="center">
 
-**Build a reusable AI team from any project—without rewriting a giant PM prompt.**
+# agentorg
 
-`agentorg` is an open-source-ready **agent organization starter kit** for Herdr App + herdr-core (`hc`), Claude Code and Codex CLI. It ships installable skills, reusable team templates, a local-only provider profile registry, an explicit dry-run/start workflow, Git worktree separation for software workers, and conservative recovery checks.
+**A reusable AI team for your repo: PM, reviewer and worker, running on Herdr.**
 
-> Status: **v0.2 preview / local prototype.** Source and unit tests are included. We have **not** verified live spawning with Herdr or authenticated provider sessions on your machine. The CLI does not run itself 24/7: your PM/Herdr runtime must remain active. No GitHub repository has been published by this package.
+Your PM stays out of the loop: workers and reviewers finish the work, and you come back to what happened and who acts next.
 
-The main difference from a single orchestration prompt: the **policy** (skills), **team configuration** (project manifest), **authentication selection** (local profile aliases) and **runtime state** (Herdr + Git) are separate.
+[![tests](https://github.com/WeightForge/herdr-agent-org/actions/workflows/tests.yml/badge.svg)](https://github.com/WeightForge/herdr-agent-org/actions/workflows/tests.yml)
+[![PyPI](https://img.shields.io/pypi/v/herdr-agent-org)](https://pypi.org/project/herdr-agent-org/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://github.com/WeightForge/herdr-agent-org/blob/main/pyproject.toml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green)](https://github.com/WeightForge/herdr-agent-org/blob/main/LICENSE)
 
-## Quick start (Windows PowerShell)
+[Quickstart](#quickstart) · [How it works](#how-it-works) · [Docs](#docs) · [Contributing](#contributing)
 
-Requires Python 3.10+, Herdr App + `hc`, the desired Claude/Codex CLIs and Git for software worktrees. `hc --skill` describes the installed Herdr version. Python scripts require no extra runtime libraries.
+English · [ภาษาไทย](https://github.com/WeightForge/herdr-agent-org/blob/main/README_TH.md)
 
-```powershell
-# From this cloned/unzipped repository
-py -m pip install -e .
-agentorg install --target both       # skills for Claude Code and Codex
+</div>
 
-# In your existing project repository
-cd C:\Code\my-project
-agentorg init --template engineering --name my-project
+---
 
-# Profiles are LOCAL ONLY. No email or API key is written to the repo.
-agentorg profile add reviewer --provider claude --config-dir "$HOME\.claude-work" --model opus --effort medium
-agentorg profile add implementer --provider claude --config-dir "$HOME\.claude-personal" --model sonnet --effort high
-agentorg profile add designer --provider claude --config-dir "$HOME\.claude-work" --model opus --effort medium
-agentorg profile add frontend --provider codex --model gpt-6.2-sol --effort medium
+`agentorg` is a small, dependency-free Python CLI plus four agent skills. It starts a **PM → reviewer → worker** team of Claude Code, Codex or Antigravity sessions on Herdr App and its `hc` CLI, gives each software worker its own Git worktree, and keeps all coordination in plain files under `.ai/`.
 
-# Bind team roles to aliases; use a different combination in each project
-agentorg role set technical-reviewer --profile reviewer
-agentorg role set backend-worker --profile implementer
-agentorg role set design-reviewer --profile designer
-agentorg role set frontend-worker --profile frontend
+> Status: pre-1.0. The unit tests use mocks. The `team smoke` command exercises a live Herdr core with fake agents. Treat the setup as a careful beta and read [Safety](#safety-model) first.
 
-agentorg doctor
-agentorg team plan                 # safe preview; no agents/worktrees started
+## Why
 
-# Review/edit .ai/PROJECT.md, .ai/ROADMAP.md and .ai/TEAM.json.
-# Software worker worktrees require .ai/TEAM.json in a Git commit.
-git add .ai QUESTION.md
-git commit -m "Configure agent organization"
+One giant PM prompt that dispatches, polls, relays review comments and remembers everything does not scale: it burns context and turns the PM into a messenger. `agentorg` splits the problem:
 
-agentorg team up --apply          # explicit action: creates worktrees and Herdr agents
-agentorg team status
-# Dispatch is packet + path only (see .ai/PROTOCOL.md): the PM writes .ai/tasks/T-1/packet.md, then sends the
-# worker AND its reviewer just that absolute path. Do not paste task text into `team send`.
-agentorg team send backend-worker "/abs/path/to/project/.ai/tasks/T-1/packet.md"
-agentorg team send technical-reviewer "/abs/path/to/project/.ai/tasks/T-1/packet.md"
-agentorg team status              # per-task state, next actor, unknown delivery, pending owner decisions
-```
+- **Policy** lives in skills, **team shape** in `.ai/TEAM.json`, **accounts** in local profile aliases, **state** in files, Git and Herdr.
+- The PM writes a task packet once and hands control to the worker/reviewer loop.
+- The PM wakes only for a reviewer escalation. Everything else is a file you can read later.
 
-**Important:** The sample `~/.claude-work` and `~/.claude-personal` directories must already exist and be authenticated; adjust them to your local paths. Model names/effort are user-configurable and must be supported by the installed CLI and account. `agentorg doctor` checks executables and directories, **not** an API's actual model entitlements. If you use only one personal Claude config, omit `--config-dir` for that profile. Environment-based API secrets are intentionally not managed by this project.
+## Features
 
-For macOS/Linux replace `py` with `python3` and use shell paths. For a Codex account/profile isolated from the default Codex login, provide `--config-dir /path/to/codex-home` (sets `CODEX_HOME`), or Codex's native `--native-profile <name>` if configured. Claude Code uses `CLAUDE_CONFIG_DIR`—there is no universal Claude `--profile` flag.
+- Dry-run by default; nothing starts without `team up --apply`.
+- One Git worktree and branch per software worker.
+- Path-only dispatch: agents get a file path, never pasted task text.
+- Task lifecycle derived from files (`dispatched` to `done`), printed by `team status`, with the next actor named.
+- Six escalation codes, written to `.ai/inbox/`, so nothing depends on a message arriving.
+- Local-only provider profiles for `claude`, `codex` and `antigravity`; no credentials stored, no account fallback.
+- Blocked-terminal reporting without copying prompt text.
+- Standard library only; Windows and Linux.
 
-## What gets installed
+## Requirements
 
-```text
-src/agentorg/data/skills/
-  agent-org-manager/SKILL.md        # project management + team policy
-  agent-org-engineering/SKILL.md    # software-specific SDLC/PR/review gates
-  agent-org-bootstrap/SKILL.md      # first setup, profiles, manifests
-  agent-org-recovery/SKILL.md       # checkpoint + crash/limit recovery
-src/agentorg/data/*.json           # engineering, research, content templates
-src/agentorg/                      # dependency-free Python CLI
-examples/layerdelta/               # an illustrative, nonsecret team manifest
-```
+- Herdr App with `hc` 0.1.22 or newer (the current app and core, not the unrelated legacy `herdr` TUI). Check with `hc --skill`.
+- Python 3.10+ and Git.
+- At least one provider CLI, already logged in: `claude`, `codex` or `agy` (Antigravity).
 
-After `agentorg install --target both` the skills are copied to `~/.claude/skills/` and `~/.agents/skills/`. Existing skill directories are skipped unless `--force`. To load manager in Claude Code: `/agent-org-manager`. In Codex, ask it to use the `agent-org-manager` skill. Never run a downloaded skill without inspecting the source first.
-
-## A PM's first message
-
-> Use the `agent-org-manager` and `agent-org-engineering` skills. Read `.ai/PROJECT.md`, `.ai/TEAM.json`, `.ai/ROADMAP.md`, `.ai/STATE.md` and `QUESTION.md`; run `hc --skill`, `agentorg doctor` and `agentorg team plan`. Reconcile Herdr, Git and PR state. After I approve the execution plan, use `agentorg team up --apply`. Work within the documented scope and approval gates; do not merge, publish or deploy automatically.
-
-For research or content, use only `agent-org-manager` plus relevant domain criteria; the starter templates intentionally omit software-specific PR rules. **Supported team: PM + worker + reviewer for software. The research and content templates are experimental** (`"experimental": true`, shown by `team plan`).
-
-## Commands
-
-| Command | Effect |
-|---|---|
-| `agentorg init --template engineering` | Create missing `.ai` project manifests; no overwrite |
-| `agentorg profile add NAME --provider claude|codex|antigravity ...` | Save profile alias in user config only (`antigravity` runs `agy`; no `--config-dir`/`--native-profile`) |
-| `agentorg profile list` | Inspect aliases; no tokens |
-| `agentorg role list / role set ROLE --profile NAME` | Update team manifest |
-| `agentorg doctor` | Availability preflight (not live authentication) |
-| `agentorg team plan` | Preview exact role launch arguments and worktree paths |
-| `agentorg team up --apply` | Start/reuse terminals and create worker worktrees |
-| `agentorg team status` | Query recognized live terminals; reports `inbox_pending` (unhandled `.ai/inbox/*.md` escalations) and `blocked` (`{role, terminal, kind}` per blocked terminal; never prompt text, read-only, sends no input) |
-| `agentorg team down [--apply] [--remove-worktrees]` | Dry-run by default; `--apply` kills then removes only terminals whose labels match this project (workers first). `--remove-worktrees` runs `git worktree remove` without `--force` (dirty worktrees are kept; branches never deleted). Disabled roles report `disabled`; a disabled role's terminal is still stopped if it is live and its labels match |
-| `agentorg team smoke [--keep]` | Live end-to-end check against the running Herdr core using fake agents (zero model tokens; includes a codex-provider fake that must receive `--no-daemon`, and asserts `status.blocked == []`); run it from an installed `agentorg`; exit code 1 on any failed check; always cleans up unless `--keep` |
-| `agentorg team reconcile` | Refresh untracked local runtime manifest from Herdr |
-| `agentorg team send ROLE "TASK"` | Send a scoped message to a role via `hc send` |
-| `agentorg install --target both` | Copy skills into local agent directories |
-| `python evals/run.py --agent-cmd "agy --model M --mode plan -p"` | Skill evals: deterministic regex grading of an agent's planned replies (see `evals/`) |
-
-## Safety & limitations
-
-- **Explicit execution:** the default is dry-run. `--apply` starts external processes and may create Git branches/worktrees. Nothing merges, publishes, deploys or tags without separate human approval.
-- **Local-only profiles:** `AGENTORG_HOME/profiles.json` or OS-specific user config. Never commit it. `TEAM.json` stores aliases, not credentials. Profiles with explicit config directories clear conflicting inherited API authentication variables before launch. On Windows normal account-file permissions apply; validate machine security controls.
-- **No duplicate work:** deterministic Herdr terminal names are probed before launch. If the runtime fails to report accurate state, do not blindly retry. Parent PM can stop without terminating child processes started with `--outlive-parent`, subject to Herdr/core and machine availability.
-- **Git worktrees:** each enabled software *worker* gets its own worktree/branch. Reviewer roles normally read the project checkout. When docs are not committed to HEAD, startup is blocked rather than launching an uninformed agent.
-- **Real lifecycle:** Herdr is the source for whether a terminal exists, Git/CI/PR are sources for whether a task is done. The local `.ai/RUNTIME.json` is ignored by Git and never the sole source of truth.
-- **Concurrency:** `max_parallel_workers` is a policy for the PM, not enforced as a live process cap in v0.2. Monitor actual active tasks before sending new work.
-- **No automatic watcher daemon yet:** `hc wait --children any` / `hc events` can support event-driven PM operation, but v0.2 does not install a background supervisor. A stopped PM will not independently restart itself.
-- **Provider/account constraints:** corporate policies and quota limits still apply. We intentionally do not implement account fallback or auto-switch accounts.
-- **Compatibility:** targets current **Herdr App + herdr-core (`hc`)**, not the unrelated Herdr TUI's `herdr` CLI. Check `hc --skill` for your installed version.
-
-## Development and publishing
+## Quickstart
 
 ```bash
-python -m unittest discover -s tests -v
-python -m build       # optional packaging dependency
+pip install herdr-agent-org
+agentorg install --target both        # skills for Claude Code and Codex (also: claude | codex | antigravity | all)
+
+cd /path/to/your-project               # an existing Git repository
+agentorg init --template engineering --name my-project
 ```
 
-See [Thai guide](README_TH.md), [architecture](docs/ARCHITECTURE.md), [security](SECURITY.md), [Codex handoff](CODEX_HANDOFF.md), and [contributing](CONTRIBUTING.md).
+Profiles are local aliases: an executable, an optional config directory (`--config-dir`, e.g. a separate `CLAUDE_CONFIG_DIR`) and a public model/effort. No key is stored. The CLI must already be installed and logged in.
 
-License: Apache-2.0. Not affiliated with the Herdr, Anthropic or OpenAI teams.
+```bash
+agentorg profile add reviewer    --provider claude --model opus   --effort medium
+agentorg profile add implementer --provider claude --model sonnet --effort high
 
-## v2.1 — Coordinator-first PM (Worker > Reviewer > PM)
+# The engineering template ships two reviewer/worker pairs bound to the aliases
+# reviewer, implementer, designer and frontend. This quickstart runs one pair:
+agentorg role set frontend-worker --disable
+agentorg role set design-reviewer --disable
+# To bind a role to a different alias: agentorg role set backend-worker --profile NAME
 
-The PM only plans milestones, assigns task owners/reviewers, resolves blockers/decisions and receives **reviewer-verified milestone reports**. Workers implement/test and notify their paired reviewer directly; reviewers own feedback, QA and correction cycles. PM must not poll frequently or relay ordinary review comments. Runtime topology: `team up --apply` launches reviewers first as children of the PM, and each paired worker with `--parent <its reviewer terminal>`, so worker notes from Herdr reach the reviewer and only reviewer escalations reach the PM (PM -> reviewers -> workers). The launching terminal's `HC_TERMINAL_ID` is passed to reviewers as the PM address. Beyond that this is a **skill policy and initial agent prompt**, not a background watcher or guaranteed always-on scheduler.
+agentorg doctor                        # executables and directories only; not live auth
+agentorg team plan                     # dry run: exact argv and worktree paths
 
-The engineering template includes `reviewer_role` on worker roles, e.g. `backend-worker → technical-reviewer`. On new work, explicitly pair the worker with the reviewer. Users may override or remove the optional routing field, but a configured reviewer must exist and be enabled.
-
-### Install skill for a PM host
-
-```powershell
-agentorg install --target claude       # ~/.claude/skills (or CLAUDE_CONFIG_DIR)
-agentorg install --target codex        # ~/.agents/skills
-agentorg install --target antigravity  # ~/.gemini/config/skills
-agentorg install --target all          # all three
+git add .ai QUESTION.md && git commit -m "Configure agent organization"   # worktrees branch from HEAD
+agentorg team up --apply               # creates worktrees and Herdr terminals
 ```
 
-`both` remains the backwards-compatible Claude + Codex alias. When updating an older install, use `--force` **after checking for local custom edits**. Codex can invoke `$agent-org-manager`; Antigravity App/IDE supports `/agent-org-manager`. Skill discovery does not confer access to Herdr: the agent must have shell/tool permission to call `hc` in an environment connected to the running Herdr Core.
+Then, from your PM session (the `agent-org-manager` skill does this for you), dispatch a task by path:
 
-Antigravity can serve as an interactive PM through its skill and `hc` shell calls, and (v0.3) as a launched role: `agentorg profile add NAME --provider antigravity [--model M] [--effort low|medium|high|xhigh|max]` starts `agy [--model M] [--effort E] -i <prompt>`. A PM outside a Herdr terminal may not receive `hc send` push messages: reviewers write each escalation to `.ai/inbox/` and the PM reads that folder whenever it wakes.
+```bash
+# 1. The PM writes the immutable packet (template in the agent-org-engineering skill)
+#    .ai/tasks/T-1/packet.md
+# 2. Send the worker and its reviewer the absolute path, once, without --wait
+agentorg team send backend-worker     "/abs/path/my-project/.ai/tasks/T-1/packet.md"
+agentorg team send technical-reviewer "/abs/path/my-project/.ai/tasks/T-1/packet.md"
+# 3. End the turn. Later:
+agentorg team status
+```
 
-### PM inbox
+On Windows PowerShell the same commands work; use `py -m pip` if `pip` is not on `PATH`, and Windows-style paths. To work from a clone instead: `pip install -e .`.
 
-Reviewers write escalations as new files `.ai/inbox/<UTC YYYYmmddTHHMMSSZ>-<task>-<code>-<4 hex>.md` (the 4 hex chars are generated once and reused on retry) in the project root checkout and, if they know the PM address, `hc send` a one-line pointer. Only the PM edits `.ai/STATE.md`; on every wake it reads `.ai/inbox/*.md`, skips ids already in the "Handled escalations" list of `.ai/STATE.md`, handles each other file, records its id there BEFORE moving the file to `.ai/inbox/done/`, and reconciles against evidence before replaying an id whose action may have happened unrecorded. `agentorg init` ignores `inbox/` in `.ai/.gitignore` (existing `.gitignore` files are not rewritten; add `inbox/` yourself).
+## How it works
 
-### Task files and file-first handoff
+```mermaid
+flowchart TD
+    H([You, the owner]) -->|goals, approvals| PM[PM terminal]
+    PM -->|"packet.md path"| R[Reviewer]
+    PM -->|"packet.md path"| W[Worker]
+    R -. "parent of" .-> W
+    W -->|"commit .ai/handoff/T-1.md, then send branch@commit:path"| R
+    R -->|"review, fix loop"| W
+    R -->|"escalation file in .ai/inbox/ (+ optional hc send)"| PM
+    PM -->|"milestone_ready, blocked, requires_owner_decision"| H
+    subgraph owners [One writer per file]
+      F1[".ai/tasks/T-1/packet.md : PM"]
+      F2[".ai/tasks/T-1/progress.md : reviewer"]
+      F3[".ai/handoff/T-1.md : worker, on its branch"]
+      F4[".ai/inbox/*.md : reviewer"]
+      F5[".ai/STATE.md : PM"]
+    end
+```
 
-Software tasks live in the root checkout under `.ai/tasks/<id>/` (versioned project state: do not gitignore it; `agentorg init` does not create it). Every file has one writer:
+- `team up --apply` starts reviewers as children of the PM terminal and each worker with `--parent <its reviewer>`, so Herdr reports worker events (turn ended, blocked, exited) to the reviewer, and only reviewer escalations reach the PM.
+- Messages only point at files. A lost message loses nothing; the file is the record.
+- The PM reads `.ai/inbox/*.md` whenever it wakes. If the PM is outside Herdr, nothing is pushed and the inbox is the channel.
+- The full rules (file layout, states, escalation codes) are in [`PROTOCOL.md`](https://github.com/WeightForge/herdr-agent-org/blob/main/src/agentorg/data/PROTOCOL.md), copied to `.ai/PROTOCOL.md` in your project.
 
-- `packet.md`: written once by the PM before dispatch (immutable). The PM sends the worker and the paired reviewer only its absolute path. Optional `blocked_by: <task id>`; the dependent task's reviewer records the accepted prerequisite commit in `progress.md` before releasing the dependent worker.
-- `progress.md`: created and solely owned by the reviewer on receipt (the acknowledgement): state, consecutive UNPRODUCTIVE rounds (RCA counter), accepted dependency commits, evidence refs as `<branch>@<commit>:<path>`. Receivers dedupe by task id.
-- Recovery: packet without `progress.md` is resent to worker and reviewer; `State: acknowledged` without a worker ACK (`unknown_delivery` in `team status`) is resent to the worker only; later states are in flight (receivers dedupe by task id). See `.ai/PROTOCOL.md`.
-- The worker commits its report to its branch at `.ai/handoff/<task>.md` BEFORE `hc send`, then sends `<branch>@<commit>:.ai/handoff/<task>.md`; the reviewer reads it with `git show <commit>:<path>`. If the send blocks, the evidence already exists.
+## A worked example
 
-Codex roles are launched with `--no-daemon` (required by `hc --skill`, otherwise Codex commands run outside hc) and carry an extra label `nodaemon=1`. A Codex terminal started by an older agentorg lacks that label, so `team up` refuses to reuse it ("label differs"): stop it deliberately (`team down --apply`) and start it again.
+Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 
-### Unattended operation
+1. **Packet.** The PM writes `.ai/tasks/T-1/packet.md` (objective, scope, acceptance criteria, tests, reviewer, `blocked_by: none`) and sends its path to the worker and reviewer. State: `dispatched`, next actor `reviewer`.
+2. **Acknowledge.** The reviewer creates `progress.md` with `State: acknowledged`. State: `acknowledged`, next actor `worker`.
+3. **ACK.** The worker reads the packet and sends the reviewer `ACK T-1`; the reviewer records `State: started`.
+4. **Handoff.** The worker implements on its worktree branch, commits `.ai/handoff/T-1.md`, then sends the reviewer `<branch>@<commit>:.ai/handoff/T-1.md`. The reviewer sets `State: in_review`.
+5. **Review.** The reviewer reads the handoff with `git show`, runs the tests and sends findings straight to the worker. The PM is not involved; after 3 unproductive rounds (configurable) the reviewer requires a root-cause analysis instead of more patches.
+6. **Done.** When verified, the reviewer sets `State: done` and writes `.ai/inbox/20260101T120000Z-T-1-milestone_ready-3fa9.md`.
+7. **You.** The PM wakes, reads the inbox and tells you the task is ready. Merging is your decision.
 
-Agents run `hc send/read/get/ls`, and each provider prompts the human for commands it has not been allowed to run. Pre-allow just those commands in each provider's own settings and do not use dangerous skip-permission flags. Prefer exact targets: terminal names are `ao-<project>-<role>-<hash>`, so Claude Code (`settings.json`) can use `"permissions": {"allow": ["Bash(hc send ao-myproj-*)", "Bash(hc read:*)", "Bash(hc get:*)", "Bash(hc ls:*)"]}` where your version supports mid-pattern wildcards. A prefix rule (`Bash(hc send:*)`) matches any trailing arguments and may also allow flags such as `--force`, so where a provider cannot express the restriction keep interactive approval. For Codex and Antigravity configure their equivalent allowlist or approval mode. Folder trust remains a per-worktree human decision (for example Antigravity for `.agentorg-worktrees`). `team status` lists blocked terminals (`blocked`: role, terminal, kind) so the PM can tell the human which terminal needs action. Agents must never answer each other's permission prompts (`hc keys` to a blocked agent is forbidden); a blocked worker is escalated as `blocked` to the human.
+`agentorg team status` at that point (trimmed; `status` has one entry per enabled role):
 
-For existing teams, configure reviewer pairing with `agentorg role set backend-worker --reviewer-role technical-reviewer`. Existing agent processes are not re-prompted or restarted by installing updated skills; communicate the new handoff policy explicitly to running agents, and do not relaunch an active terminal blindly.
+```json
+{
+  "project": "my-project",
+  "inbox_pending": 1,
+  "blocked": [],
+  "owner_decisions": [],
+  "tasks": [
+    { "id": "T-1", "state": "done", "next_actor": "pm", "flags": [] }
+  ],
+  "status": [
+    { "role": "technical-reviewer", "terminal": "ao-my-project-technical-reviewer-<hash>", "live": true, "details": { "...": "..." } },
+    { "role": "backend-worker",     "terminal": "ao-my-project-backend-worker-<hash>",     "live": true, "details": { "...": "..." } }
+  ]
+}
+```
+
+`next_actor` is `reviewer`, `worker`, `pm` or `none`. `flags` can contain `unknown_delivery` (acknowledged but no worker `ACK`: re-send the packet path to the worker only) or `waiting_on_dependency`. `owner_decisions` lists unhandled `requires_owner_decision` and `safety_or_cost_risk` escalations; `blocked` lists terminals waiting on a human prompt (`role`, `terminal`, `kind`; never prompt text).
+
+## Command reference
+
+| Command | What it does |
+|---|---|
+| `agentorg init [--template engineering\|research\|content] [--name N]` | Create missing `.ai/` files and `.ai/PROTOCOL.md`; never overwrites |
+| `agentorg profile add NAME --provider claude\|codex\|antigravity [--config-dir D] [--model M] [--effort E] [--native-profile P] [--command EXE] [--replace]` | Save a local profile alias (no secrets) |
+| `agentorg profile list \| remove NAME` | Inspect or delete aliases |
+| `agentorg role set ROLE [--profile P] [--model M] [--effort E] [--reviewer-role R] [--enable\|--disable]` | Edit the team manifest (validated before write) |
+| `agentorg role list` | Show roles |
+| `agentorg doctor` | Check Python, `hc`, `git`, provider CLIs and profile directories; no API calls |
+| `agentorg team plan` | Dry run: exact launch argv and worktree paths |
+| `agentorg team up [--apply]` | Start or reuse terminals and create worktrees (only with `--apply`) |
+| `agentorg team send ROLE MESSAGE [--wait]` | `hc send` to a live role; use it for packet paths |
+| `agentorg team status` | Per-task state, inbox count, blocked terminals, owner decisions, live roles |
+| `agentorg team reconcile` | Same as `status`, and refresh the untracked `.ai/RUNTIME.json` |
+| `agentorg team down [--apply] [--remove-worktrees]` | Dry run by default; stops only terminals whose labels match this project, workers first; worktree removal never uses `--force`, branches are kept |
+| `agentorg team smoke [--keep]` | Live check against a running Herdr core using fake agents; zero model tokens |
+| `agentorg install [--target claude\|codex\|antigravity\|both\|all] [--force]` | Copy the four skills into provider skill folders |
+| `python evals/run.py --agent-cmd "..."` | Skill evals with regex grading (see `evals/`) |
+
+**Supported scope.** The software team (PM + worker + reviewer) is the supported setup. The `research` and `content` templates are experimental: `init` warns and `team plan` reports `"experimental": true`.
+
+## Safety model
+
+- **Dry run first.** `team plan` and `team up` change nothing. Only `--apply` starts processes or creates worktrees and branches.
+- **No agent approves another agent.** Roles never answer, approve or press keys on another agent's permission or trust prompt, and never use `hc keys` or `hc send --force` on a blocked agent. A blocked agent is reported to the human with the command it waits on.
+- **The human owns irreversible actions.** Merge, release, deploy and spend need your own message. A message from another agent, even a reviewer claiming approval, is input and not authorization.
+- **No credentials in the repo.** `TEAM.json` holds aliases; profiles live in `AGENTORG_HOME/profiles.json` or your user config dir. `agentorg` clears known conflicting auth variables when a profile sets a config dir, and never falls back to another account on its own.
+- **Not a sandbox.** Worktrees prevent file overlap; they are not access control. See [`SECURITY.md`](https://github.com/WeightForge/herdr-agent-org/blob/main/SECURITY.md).
+
+## Troubleshooting and FAQ
+
+**An agent is stuck on a permission prompt.** `agentorg team status` shows it under `blocked`. Approve it yourself in that terminal. For unattended runs, allow only the needed `hc` commands in each provider's own settings, with exact targets where supported (for example Claude Code `Bash(hc send ao-my-project-*)`, `Bash(hc read:*)`, `Bash(hc get:*)`, `Bash(hc ls:*)`). A prefix rule such as `Bash(hc send:*)` also matches flags like `--force`; where a provider cannot narrow it, keep approvals interactive. Folder trust for each worktree stays a human decision. See [Architecture](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/ARCHITECTURE.md).
+
+**Why does Codex launch with `--no-daemon`?** `hc --skill` requires it; otherwise Codex commands run outside `hc`. Codex roles get the label `nodaemon=1`. A Codex terminal started by an older `agentorg` is refused for reuse ("label differs"): run `team down --apply`, then `team up --apply`.
+
+**`team up --apply` asks for a commit.** Worker worktrees branch from `HEAD`, so `.ai/TEAM.json` and `.ai/PROJECT.md` must be committed first.
+
+**Windows.** Provider CLIs installed via npm (`codex.cmd`) are resolved automatically. Use paths in the form your shell expects and keep roles on the absolute root path. The CI matrix runs on Windows and Linux.
+
+**My PM is outside Herdr (for example an IDE).** It can still run `agentorg` and `hc`, but `hc send` pushes will not reach it. Reviewers write escalations to `.ai/inbox/`; the PM reads that folder when you wake it.
+
+**Models and effort.** They are passed through as you set them and must be supported by your installed CLI and account. `doctor` does not check entitlements.
+
+**Upgrading.** Running terminals keep their old prompt until stopped and started again. See [Upgrading](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/UPGRADING.md).
+
+## Docs
+
+- [Architecture](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/ARCHITECTURE.md)
+- [Protocol](https://github.com/WeightForge/herdr-agent-org/blob/main/src/agentorg/data/PROTOCOL.md)
+- [Upgrading](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/UPGRADING.md)
+- [Security](https://github.com/WeightForge/herdr-agent-org/blob/main/SECURITY.md)
+- [Changelog](https://github.com/WeightForge/herdr-agent-org/blob/main/CHANGELOG.md)
+- [Example manifest](https://github.com/WeightForge/herdr-agent-org/tree/main/examples/layerdelta)
+- Maintainers: [Codex handoff](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/maintainers/CODEX_HANDOFF.md), [Publishing](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/maintainers/PUBLISHING.md)
+
+## Roadmap
+
+- Event-driven watcher with a persistent checkpoint (today the PM wakes on reviewer escalations and `hc` notes; there is no background supervisor).
+- More live testing across Windows, Linux and Herdr versions.
+- Enforce `max_parallel_workers` (currently PM policy, not a process cap).
+- CI/PR adapters and mature research/content templates.
+
+## Contributing
+
+Issues and PRs are welcome. Start with [CONTRIBUTING.md](https://github.com/WeightForge/herdr-agent-org/blob/main/CONTRIBUTING.md). Any change that starts processes, spends money or publishes must stay behind an explicit approval.
+
+## License
+
+[Apache-2.0](https://github.com/WeightForge/herdr-agent-org/blob/main/LICENSE). Not affiliated with Herdr, Anthropic or OpenAI.
