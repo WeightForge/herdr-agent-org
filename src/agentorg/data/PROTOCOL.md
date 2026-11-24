@@ -42,8 +42,8 @@ State is derived from files only (`agentorg team status` prints it). Each state 
 | State | Evidence | Written by | Next actor |
 |---|---|---|---|
 | `dispatched` | `packet.md`, no `progress.md` | PM | reviewer: create `progress.md` with `State: acknowledged` |
-| `acknowledged` | `State: acknowledged` | reviewer | worker: read the packet path, then send the reviewer `ACK <task>` |
-| `started` | `State: started` | reviewer, after the worker's `ACK` | worker: implement, commit `.ai/handoff/<task>.md`, send the reference |
+| `acknowledged` | `State: acknowledged` | reviewer | worker: read the packet path, send the reviewer `ACK <task>`, then start work at once (no go-ahead needed) |
+| `started` | `State: started` | reviewer, after the worker's `ACK` (no reply to the worker needed) | worker: implement, commit `.ai/handoff/<task>.md`, send the reference |
 | `in_review` | `State: in_review` | reviewer, on receiving a handoff reference | reviewer: review and run the fix loop |
 | `done` | `State: done` | reviewer, after verification and a `milestone_ready` escalation | PM / owner (merge is the owner's decision) |
 | `blocked` | `State: blocked` | reviewer, with a `blocked` escalation | PM / owner; the reviewer sets `started` again once resolved |
@@ -54,7 +54,7 @@ Unknown delivery: `acknowledged` with no worker `ACK` (and no `Waiting-on`) mean
 
 Precedence when deriving: `cancelled`, then `reassigned`, then the `State:` line, then `dispatched`.
 
-Dependencies: if the packet has `blocked_by: <task id>`, the reviewer keeps the task `acknowledged` with `Waiting-on: <id>` and does not release the worker until the prerequisite's `progress.md` says `State: done`. It then records the accepted prerequisite commit, removes `Waiting-on`, and tells the worker to go ahead; the worker `ACK`s and the task becomes `started`. The PM is not woken.
+Dependencies: if the packet has `blocked_by: <task id>`, the reviewer keeps the task `acknowledged` with `Waiting-on: <id>` and does not release the worker until the prerequisite's `progress.md` says `State: done`. It then records the accepted prerequisite commit, removes `Waiting-on`, and tells the worker to go ahead; the worker `ACK`s and the task becomes `started`. This go-ahead is the only case where the worker waits after reading a packet: a packet without an unresolved `blocked_by` is started right after the `ACK`. The PM is not woken.
 
 Cancellation: the PM writes `.ai/tasks/<id>/cancel` and sends the reviewer and the worker its absolute path once. Both stop work on the task at once. The worker commits nothing further; the reviewer does not escalate it.
 

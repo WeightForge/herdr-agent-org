@@ -401,7 +401,7 @@ def make_agent_prompt(project: Path, role: dict, pm: str | None = None) -> str:
     if reviewer_id:
         reviewer = resolve_role(doc, reviewer_id)
         route = (f"Your reviewer is {reviewer_id}, Herdr terminal {terminal_name(project, reviewer_id)}. "
-                 "You receive the absolute path of a task packet from the PM: read it there, never edit it, and reply ACK TASK to your reviewer. "
+                 "You receive the absolute path of a task packet from the PM: read it there, never edit it, reply ACK TASK to your reviewer, then start at once unless the packet's blocked_by is unresolved (then wait for the reviewer's go-ahead). "
                  "Commit your report to .ai/handoff/TASK.md before you hc send it to the reviewer; handle feedback with the reviewer, not the PM. ")
     elif role.get("mode") == "reviewer":
         workers = [r for r in doc["roles"] if r.get("reviewer_role") == role["id"] and r.get("enabled", True)]
