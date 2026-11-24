@@ -204,7 +204,7 @@ def role_launch_cmd(project: Path, role: dict, cwd: Path) -> list[str]:
     return command + ["--pm", pm] if pm else command
 
 
-def start_team(project: Path, *, apply: bool = False):
+def start_team(project: Path, *, apply: bool = False, panes: bool = True, report: dict | None = None):
     doc = load_project(project)
     profiles = load_profiles()
     issues = validate_binaries(doc, profiles)
@@ -247,7 +247,102 @@ def start_team(project: Path, *, apply: bool = False):
             runtime.setdefault("terminals", {})[role["id"]] = {"name": name, "cwd": str(cwd), "status": item["action"]}
             write_json(project / ".ai" / "RUNTIME.json", runtime)
         result.append(item)
+    if apply and report is not None:
+        report["panes"] = arrange_panes(project, result) if panes else {"arranged": [], "skipped": "--no-panes"}
     return result
+
+
+def _ls_panes() -> dict:
+    """terminal address -> (pane id, tab id) for every terminal that has a pane."""
+    r = run_process(["herdr-app", "ls"], timeout=5)
+    if r.returncode != 0:
+        raise OrgError("herdr-app ls failed")
+    found = {}
+    for space in json.loads(r.stdout).get("spaces", []):
+        for tab in space.get("tabs", []):
+            for t in tab.get("terminals", []):
+                if t.get("pane"):
+                    found[t["terminal"]] = (t["pane"], tab["id"])
+    return found
+
+
+def _herdr_do(*args):
+    r = run_process(["herdr-app", "do", *args], timeout=10)
+    if r.returncode != 0:
+        raise OrgError(f"herdr-app do {args[0]} failed: {(r.stderr or r.stdout).strip()[:200]}")
+    return r.stdout
+
+
+def arrange_panes(project: Path, results: list) -> dict:
+    """Show the team as panes in the PM's tab: reviewers down a column, each one's workers to its right.
+
+    Best effort: any failure warns on stderr and leaves the rest of the team hidden but working.
+    """
+    pm = pm_terminal()
+    if not pm or not which("herdr-app"):
+        return {"arranged": [], "skipped": "no PM terminal or no herdr-app"}
+    arranged = []
+    try:
+        snap = _ls_panes()
+        if pm not in snap:
+            return {"arranged": [], "skipped": "PM terminal has no pane"}
+        pm_pane, pm_tab = snap[pm]
+        roles = {r["id"]: r for r in load_project(project)["roles"]}
+        addr = {}
+        for item in results:
+            got = run_process(["hc", "get", item["terminal"], "--json"], timeout=15)
+            if got.returncode == 0:
+                data = json.loads(got.stdout)
+                addr[item["role"]] = (data.get("terminal", data) if isinstance(data, dict) else {}).get("address")
+        rows = {}  # reviewer id (or None for workers without an enabled reviewer) -> role ids
+        for item in results:
+            role = roles[item["role"]]
+            if role["mode"] == "reviewer":
+                rows.setdefault(role["id"], []).insert(0, role["id"])
+            else:
+                key = role.get("reviewer_role") if role.get("reviewer_role") in addr else None
+                rows.setdefault(key, []).append(role["id"])
+        # (role, anchor role or None for the PM, place)
+        # Row heads first, then workers: this is the order that was verified live.
+        plan, prev_row = [], None
+        for ids in rows.values():
+            plan.append((ids[0], prev_row, "right" if prev_row is None else "down"))
+            prev_row = ids[0]
+        for ids in rows.values():
+            plan += [(w, p, "right") for p, w in zip(ids, ids[1:])]
+        # shortcut: each split halves the anchor, so 3+ rows get unequal heights; resize by hand or use a grid if it matters
+        for rid, anchor, place in plan:
+            if not addr.get(rid):
+                continue
+            if addr[rid] in snap:
+                continue  # already has a pane (rerun or reused terminal)
+            anchor_addr = addr.get(anchor) if anchor else pm
+            if anchor_addr not in snap:
+                break
+            _herdr_do("pane.focus", "--pane", snap[anchor_addr][0])
+            reply = json.loads(_herdr_do("terminal.keep", "--terminal", addr[rid], "--place", place) or "{}")
+            if reply.get("error") or reply.get("tab") != pm_tab:
+                # keep splits the FOCUSED pane; if that was not the PM's tab, undo and stop
+                _herdr_do("terminal.park", "--terminal", addr[rid])
+                raise OrgError(f"pane for {rid} landed outside the PM tab; stopped arranging")
+            for _ in range(20):
+                snap = _ls_panes()
+                if addr[rid] in snap:
+                    break
+                time.sleep(0.25)
+            else:
+                raise OrgError(f"pane for {rid} did not appear")
+            arranged.append(rid)
+        return {"arranged": arranged}
+    except (OrgError, ValueError, KeyError, AttributeError) as exc:
+        print(f"WARNING: could not arrange panes ({exc}); the team still runs hidden.", file=sys.stderr)
+        return {"arranged": arranged, "skipped": str(exc)}
+    finally:
+        if arranged:
+            try:
+                _herdr_do("pane.focus", "--pane", pm_pane)
+            except OrgError:
+                pass
 
 
 def inbox_pending(project: Path) -> int:

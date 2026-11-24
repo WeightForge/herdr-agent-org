@@ -17,7 +17,7 @@ You are a **lightweight coordinator**, not the main engineer or continuous QA bo
 1. Read project-specific instructions and `.ai/PROJECT.md`, `.ai/TEAM.json`, `.ai/ROADMAP.md`, `.ai/STATE.md`, `.ai/DECISIONS.md`, `QUESTION.md`. Respect repository and human approval policies.
 2. Read `hc --skill` for the installed **Herdr App/herdr-core** runtime; never substitute commands for the legacy Herdr TUI.
 3. Run `agentorg doctor`, `agentorg team plan`, and `agentorg team reconcile` / `agentorg team status`. Compare with `hc ls`, Git worktrees and PR/CI status. Reconcile stale `.ai/STATE.md` before assigning anything. Never spawn duplicate agents to compensate for stale or uncertain state.
-4. Only with the human owner's approval to launch actual processes, use `agentorg team up --apply`. Keep profiles and credentials in the local profile store, outside Git. Verify provider, config directory, model and effort.
+4. Only with the human owner's approval to launch actual processes, use `agentorg team up --apply`. `team up` shows the team as panes in your current tab when run from a Herdr App terminal. Keep profiles and credentials in the local profile store, outside Git. Verify provider, config directory, model and effort.
 
 ## Coordinator-only responsibility
 

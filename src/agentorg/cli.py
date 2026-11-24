@@ -63,6 +63,8 @@ def add_parser() -> argparse.ArgumentParser:
     for op in ("plan", "up", "status", "reconcile", "down"):
         a = ts.add_parser(op)
         a.add_argument("--path", default=".")
+        if op == "up":
+            a.add_argument("--no-panes", action="store_true", help="Do not show roles as panes in the current Herdr App tab")
         if op in ("up", "down"):
             a.add_argument("--apply", action="store_true", help="Required to actually create/stop worktrees and agents")
         if op == "down":
@@ -259,12 +261,14 @@ def team_cmd(ns):
     root = rootpath(ns.path)
     doc = load_project(root)
     if ns.op in ("plan", "up"):
-        items = start_team(root, apply=(ns.op == "up" and ns.apply))
+        report = {}
+        items = start_team(root, apply=(ns.op == "up" and ns.apply), panes=not getattr(ns, "no_panes", False), report=report)
         safe = [{k: v for k, v in item.items() if k != "command"} for item in items]
         for item, visible in zip(items, safe):
             if not (ns.op == "up" and ns.apply):
                 visible["argv"] = item["command"]
         out = {"mode": "apply" if ns.op == "up" and ns.apply else "dry_run", "roles": safe}
+        out.update(report)
         if doc.get("experimental"):
             out["experimental"] = True
         print(json.dumps(out, indent=2))
