@@ -6,6 +6,7 @@ Read `README.md`, `docs/ARCHITECTURE.md`, `SECURITY.md`, `docs/maintainers/CODEX
 
 - Preserve safe defaults: no role launches without `team up --apply`, no implicit account/provider fallback, no merge/release/deploy/paid services without user approval.
 - Never place credentials, personal identities or vendor API keys in source, tests, logs, PR comments, or project `.ai/TEAM.json`.
+- Write everything in the repository (code, docs, skills, evals, commit messages) in English only.
 - Keep Python standard-library-only runtime, support Windows and Linux, and use subprocess argv lists (not shell interpolation) for command execution.
 - `agentorg profile add` stores only local config paths and public model/effort choices; do not build an auth manager.
 - Any Herdr command compatibility change must be validated against the installed `hc --skill` / `hc <cmd> --help` and mocked in unit tests before relying on it.

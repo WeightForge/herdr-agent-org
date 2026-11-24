@@ -10,7 +10,7 @@ Turn Herdr Agent Organization from a locally tested prototype into a robust open
 
 - Python stdlib `agentorg` CLI in `src/agentorg`, source-controlled `.ai/TEAM.json`, local-only profile registry, project bootstrap and role binding.
 - `agentorg team plan`, explicit `team up --apply`, deterministic terminal names, optional per-worker Git worktrees, `hc get` reconciliation.
-- Four installable skills, engineering/research/content templates, Thai/English docs and unit tests.
+- Four installable skills, engineering/research/content templates, English docs and unit tests.
 - Provider launcher with `CLAUDE_CONFIG_DIR` / `CODEX_HOME` isolation; no raw tokens stored or placed in command line. It uses the authenticated native CLI.
 
 ## Critical work for next Codex session
