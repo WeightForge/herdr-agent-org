@@ -24,7 +24,8 @@ Goal: the owner asks once, answers exactly one question, and the team is running
 ### 2. Design the team from project evidence
 
 - Give every role a domain-specific `title` and `focus` taken from what the project is. Pair each worker with a reviewer (`--reviewer-role`).
-- Default size is small: one reviewer and one worker. Add a second pair only when the project clearly needs it. Maximum two pairs on first setup.
+- Team size is the owner's decision. If the owner named a size or roles, propose exactly that, however large. There is no limit on reviewers or workers.
+- If the owner did not say, size the team from the project: a small or single-area project starts with one reviewer and one worker; a project with clearly separate areas (for example ML, frontend, infrastructure) gets one reviewer per area. One reviewer may lead several workers when the work is one area that splits into parallel tasks. Every extra agent costs quota and a first-launch trust prompt, so do not add roles the evidence does not support.
 - Assign accounts from the detected profiles. Your own (PM) account is the directory in `CLAUDE_CONFIG_DIR` (Claude Code) or `CODEX_HOME` (Codex), or the default `~/.claude` / `~/.codex` when unset. Prefer accounts other than the PM's when possible, and put workers on the account with the most headroom if the owner said which. Do not invent model names: leave model and effort unset (CLI default) unless the owner specified them.
 - Choose the role ids (lowercase, `-`), for example `ai-scientist`, `ai-engineer`.
 
