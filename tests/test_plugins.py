@@ -34,6 +34,20 @@ class PluginVersionTests(unittest.TestCase):
             pins = re.findall(re.escape(PIN) + r"([0-9][^ `]*)", f.read_text(encoding="utf-8"))
             self.assertEqual(pins, [agentorg.__version__], f.parent.name)
 
+    def test_skills_use_path_agentorg_only_on_exact_version(self):
+        rules = set()
+        for f in (DATA / "skills").glob("*/SKILL.md"):
+            m = re.search(r"Resolve once per session:.*?`uv`\)\.", f.read_text(encoding="utf-8"), re.S)
+            self.assertTrue(m, f.parent.name)
+            self.assertIn(f"prints exactly `{agentorg.__version__}`", m.group(0))
+            rules.add(m.group(0))
+        self.assertEqual(len(rules), 1, "the rule must be identical in every skill")
+
+    def test_release_workflow_not_triggered_by_tags(self):
+        wf = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertIn("types: [published]", wf)
+        self.assertNotIn("tags:", wf)
+
 
 if __name__ == "__main__":
     unittest.main()

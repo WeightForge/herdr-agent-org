@@ -7,7 +7,7 @@ description: Initialize an AI organization for an existing software, research or
 
 ## Running the CLI
 
-Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: if `agentorg --version` works, use `agentorg`; otherwise run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither `agentorg` nor `uvx` exists, ask the user to install `uv` or `pip install herdr-agent-org`. The tag keeps the CLI on the same version as this skill.
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.6.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.6.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
 <!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.6.0`. tests/test_plugins.py checks the pin against __version__. -->
 
 1. Inspect README, docs, current repo, legal/privacy needs and user request. Do not invent product specifics or overwrite existing docs.

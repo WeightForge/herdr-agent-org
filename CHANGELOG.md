@@ -1,6 +1,8 @@
 ## 0.6.0 - plugins
 - Installable as a plugin for Claude Code, Codex and Antigravity: manifests live in `src/agentorg/data/` (the plugin root, next to the single canonical `skills/` copy); marketplaces at `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`.
 - Skills resolve the CLI once: `agentorg` if on `PATH`, else `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg`.
+- Skills use a PATH `agentorg` only if it reports exactly the skill's version; otherwise the tag-pinned uvx fallback runs, so an older pip install is never mixed with newer skills.
+- `release.yml` now runs on a published GitHub Release (or manually), not on tag push: tagging makes the uvx pin resolvable, publishing to PyPI is a separate decision.
 - `tests/test_plugins.py` fails if manifest versions, the uvx pin and `__version__` drift.
 - Verified: `team smoke` passes when run through `uvx --from <repo>`.
 
