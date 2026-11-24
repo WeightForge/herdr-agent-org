@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "project_id": "layerdelta",
+  "project_id": "notes-app",
   "kind": "software",
   "human_approval": {
     "merge": true,
@@ -15,43 +15,43 @@
   },
   "roles": [
     {
-      "id": "ai-scientist",
-      "title": "Senior AI Scientist",
+      "id": "tech-lead",
+      "title": "Tech Lead",
       "mode": "reviewer",
-      "profile": "claude-work",
+      "profile": "claude-main",
       "model": "opus",
       "effort": "medium",
-      "focus": "Weight-space architecture, model support, benchmarks, independent technical review",
+      "focus": "Architecture, API design, sync correctness and independent technical review",
       "enabled": true
     },
     {
-      "id": "ai-engineer",
-      "title": "Senior AI Engineer",
+      "id": "backend",
+      "title": "Backend Engineer",
       "mode": "worker",
-      "profile": "claude-pro",
+      "profile": "claude-main",
       "model": "sonnet",
       "effort": "high",
-      "focus": "AI/backend/model import/weight transformations/tests",
+      "focus": "API, storage, sync and tests",
       "enabled": true
     },
     {
-      "id": "ux-designer",
-      "title": "Senior UX Designer",
+      "id": "design-lead",
+      "title": "Design Lead",
       "mode": "reviewer",
-      "profile": "claude-work",
+      "profile": "claude-main",
       "model": "opus",
       "effort": "medium",
-      "focus": "Interaction, model architecture visualization and visual quality review",
+      "focus": "Interaction, accessibility and visual quality review",
       "enabled": true
     },
     {
       "id": "frontend",
-      "title": "Senior Frontend Engineer",
+      "title": "Frontend Engineer",
       "mode": "worker",
-      "profile": "codex-personal",
+      "profile": "codex-main",
       "model": "gpt-6.2-sol",
       "effort": "medium",
-      "focus": "Desktop app/frontend visualization and interaction implementation",
+      "focus": "Web client UI, offline support and interaction implementation",
       "enabled": true
     }
   ]

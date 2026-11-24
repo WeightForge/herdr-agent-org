@@ -275,9 +275,7 @@ class TempOrgTest(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 cli.main(["init", "--path", str(path), "--template", name])
             config.load_project(path)
-        example = Path(__file__).resolve().parent.parent / "examples" / "layerdelta"
-        if example.is_dir():
-            config.load_project(example)
+        config.load_project(Path(__file__).resolve().parent.parent / "examples" / "web-app")
 
     def test_status_reports_per_role_error_and_reconcile_keeps_fields(self):
         from types import SimpleNamespace

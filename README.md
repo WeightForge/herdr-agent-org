@@ -236,7 +236,7 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 - [Upgrading](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/UPGRADING.md)
 - [Security](https://github.com/WeightForge/herdr-agent-org/blob/main/SECURITY.md)
 - [Changelog](https://github.com/WeightForge/herdr-agent-org/blob/main/CHANGELOG.md)
-- [Example manifest](https://github.com/WeightForge/herdr-agent-org/tree/main/examples/layerdelta)
+- [Example manifest](https://github.com/WeightForge/herdr-agent-org/tree/main/examples/web-app)
 - Maintainers: [Codex handoff](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/maintainers/CODEX_HANDOFF.md), [Publishing](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/maintainers/PUBLISHING.md)
 
 ## Roadmap
