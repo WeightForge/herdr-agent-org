@@ -13,8 +13,6 @@ Your PM stays out of the loop: workers and reviewers finish the work, and you co
 
 [Quickstart](#quickstart) · [How it works](#how-it-works) · [Docs](#docs) · [Contributing](#contributing)
 
-English · [ภาษาไทย](https://github.com/WeightForge/herdr-agent-org/blob/main/README_TH.md)
-
 </div>
 
 ---

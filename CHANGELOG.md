@@ -1,5 +1,5 @@
 ## Unreleased - documentation and packaging
-- README rewritten (new structure, worked example, command reference, Mermaid diagram); Thai README aligned; language switch links.
+- README rewritten (new structure, worked example, command reference, Mermaid diagram); Thai README removed (the repository is English-only).
 - `CODEX_HANDOFF.md` and `PUBLISHING.md` moved to `docs/maintainers/`.
 - Added pull request template and feature request template; CONTRIBUTING gains a dev setup and the no-AI-trailer commit rule.
 - PyPI metadata (classifiers, project URLs) and a tag-triggered `release.yml` using Trusted Publishing; setup documented in `docs/maintainers/PUBLISHING.md`.
