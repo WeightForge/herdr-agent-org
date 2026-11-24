@@ -146,7 +146,7 @@ Software tasks live in the root checkout under `.ai/tasks/<id>/` (versioned proj
 
 - `packet.md`: written once by the PM before dispatch (immutable). The PM sends the worker and the paired reviewer only its absolute path. Optional `blocked_by: <task id>`; the dependent task's reviewer records the accepted prerequisite commit in `progress.md` before releasing the dependent worker.
 - `progress.md`: created and solely owned by the reviewer on receipt (the acknowledgement): state, consecutive UNPRODUCTIVE rounds (RCA counter), accepted dependency commits, evidence refs as `<branch>@<commit>:<path>`. Receivers dedupe by task id.
-- Recovery: packet without `progress.md` = unacknowledged, resend the same path (safe, deduped); packet with `progress.md` = in flight, never re-dispatch.
+- Recovery: packet without `progress.md` is resent to worker and reviewer; `State: acknowledged` without a worker ACK (`unknown_delivery` in `team status`) is resent to the worker only; later states are in flight (receivers dedupe by task id). See `.ai/PROTOCOL.md`.
 - The worker commits its report to its branch at `.ai/handoff/<task>.md` BEFORE `hc send`, then sends `<branch>@<commit>:.ai/handoff/<task>.md`; the reviewer reads it with `git show <commit>:<path>`. If the send blocks, the evidence already exists.
 
 Codex roles are launched with `--no-daemon` (required by `hc --skill`, otherwise Codex commands run outside hc) and carry an extra label `nodaemon=1`. A Codex terminal started by an older agentorg lacks that label, so `team up` refuses to reuse it ("label differs"): stop it deliberately (`team down --apply`) and start it again.
