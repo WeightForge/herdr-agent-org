@@ -2,6 +2,7 @@
   "schema_version": 2,
   "project_id": "change-me",
   "kind": "content",
+  "experimental": true,
   "human_approval": {
     "publish": true,
     "significant_spend": true,

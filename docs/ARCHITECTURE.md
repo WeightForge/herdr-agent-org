@@ -25,11 +25,17 @@ PM (Claude Code or Codex + agent-org-manager skill)
 
 ## Escalation inbox
 
-Reviewers write each escalation to `.ai/inbox/<UTC>-<task>-<code>.md` (git-ignored) and optionally `hc send` the PM a pointer. The PM reads the folder on every wake, moves handled files to `.ai/inbox/done/` and alone edits `.ai/STATE.md`.
+Reviewers write each escalation to `.ai/inbox/<UTC>-<task>-<code>-<hex4>.md` (git-ignored) and optionally `hc send` the PM a pointer. The PM reads the folder on every wake, moves handled files to `.ai/inbox/done/` and alone edits `.ai/STATE.md`.
+
+## Protocol and task lifecycle
+
+`src/agentorg/data/PROTOCOL.md` (versioned, `Protocol version: 1`) is the single source of the file layout, task states, escalation codes and safety rules. `agentorg init` and `team up --apply` copy it to `.ai/PROTOCOL.md` (never overwritten unless the project copy is an older protocol version; a differing copy that is not older is kept with a warning). Launch prompts give each role the absolute path and keep only a short role summary; skills add role guidance only.
+
+Task state is derived from files, with no database: `dispatched` -> `acknowledged` (reviewer wrote `progress.md`) -> `started` (reviewer records the worker's `ACK <task>`) -> `in_review` -> `done` / `blocked`, plus `cancelled` (PM `cancel` marker) and `reassigned` (PM `reassign.md`). `team status` prints `tasks` (id, state, next actor, flags such as `unknown_delivery`) and `owner_decisions`. Workers never write into the root checkout, so the worker ack is a message that the reviewer records.
 
 ## Task files and handoffs
 
-Per task, in the root checkout, `.ai/tasks/<id>/` (versioned): `packet.md` (PM, immutable, written before dispatch; workers and reviewers receive only its absolute path) and `progress.md` (reviewer only: state, UNPRODUCTIVE-round counter, accepted dependency commits, `<branch>@<commit>:<path>` evidence refs; it doubles as the acknowledgement). `blocked_by: <task id>` records a dependency without a commit; the dependent reviewer records the accepted prerequisite commit before releasing the worker. Recovery: packet without progress is resent to the same path (receivers dedupe by task id); packet with progress is in flight.
+Per task, in the root checkout, `.ai/tasks/<id>/` (versioned): `packet.md` (PM, immutable, written before dispatch; workers and reviewers receive only its absolute path) and `progress.md` (reviewer only: state, UNPRODUCTIVE-round counter, accepted dependency commits, `<branch>@<commit>:<path>` evidence refs; it doubles as the acknowledgement). `blocked_by: <task id>` records a dependency without a commit; the dependent reviewer records the accepted prerequisite commit before releasing the worker. Recovery: packet without progress is resent to worker and reviewer; acknowledged without a worker ack (`unknown_delivery`) is resent to the worker only; later states are in flight (receivers dedupe by task id).
 
 Workers commit their report to `.ai/handoff/<task>.md` on their branch before `hc send` and send `<branch>@<commit>:<path>`; a blocked send loses nothing.
 
