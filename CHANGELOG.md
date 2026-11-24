@@ -3,7 +3,8 @@
 - `agentorg profile detect [--add]`: finds `~/.claude`, `~/.claude-*`, `~/.codex`, `~/.codex-*` and `agy` by existence checks only (no file is opened). The default dirs are stored as `config_dir: null`; `--add` skips an alias already used by a different profile.
 - `agentorg role add` / `role remove`, and `role set --title/--focus`: every agent has a real job title and focus fitted to the project; `mode` is only its level.
 - `docs/maintainers/CODEX_HANDOFF.md` rewritten as a current handoff.
-- Mock-tested only; live testing is pending.
+- Team size is the owner's decision: the bootstrap skill proposes exactly the size or roles the owner names, with no limit; otherwise it sizes from the project (one reviewer per area, several workers per reviewer allowed).
+- Verified live on Windows with an Antigravity PM (Gemini 4 Hydrogen): one proposal message, a change request answered with one revised proposal, then after "yes" profiles registered, roles with project titles, `.ai/` committed and the team launched with the worker under its reviewer. `profile detect` verified on Windows and two Linux machines. Not yet verified live: Claude Code or Codex as PM, and pane layout during bootstrap.
 
 ## 0.6.0 - plugins
 - Installable as a plugin for Claude Code, Codex and Antigravity: manifests live in `src/agentorg/data/` (the plugin root, next to the single canonical `skills/` copy); marketplaces at `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`.
