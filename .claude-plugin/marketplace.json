@@ -1,0 +1,14 @@
+{
+  "name": "herdr-agent-org",
+  "description": "Reusable AI organizations for Herdr App and herdr-core.",
+  "owner": { "name": "WeightForge", "url": "https://github.com/WeightForge" },
+  "plugins": [
+    {
+      "name": "agent-org",
+      "description": "PM, reviewer and worker AI teams on Herdr, with the agentorg CLI run via PATH or uvx.",
+      "version": "0.6.0",
+      "source": "./src/agentorg/data",
+      "category": "development"
+    }
+  ]
+}

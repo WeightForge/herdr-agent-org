@@ -1,0 +1,12 @@
+{
+  "name": "herdr-agent-org",
+  "interface": { "displayName": "Herdr Agent Org" },
+  "plugins": [
+    {
+      "name": "agent-org",
+      "source": { "source": "local", "path": "./src/agentorg/data" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Developer Tools"
+    }
+  ]
+}

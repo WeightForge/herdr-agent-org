@@ -44,17 +44,51 @@ One giant PM prompt that dispatches, polls, relays review comments and remembers
 
 - Herdr App with `hc` 0.1.22 or newer (the current app and core, not the unrelated legacy `herdr` TUI). Check with `hc --skill`.
 - Python 3.10+ and Git.
+- `uv` (for `uvx`, used by the plugin skills when `agentorg` is not on `PATH`) or a pip-installed `agentorg`.
 - At least one provider CLI, already logged in: `claude`, `codex` or `agy` (Antigravity).
 
 ## Quickstart
 
-```bash
-pip install herdr-agent-org
-agentorg install --target both        # skills for Claude Code and Codex (also: claude | codex | antigravity | all)
+Install the plugin in your coding harness. The skills run the CLI for you: `agentorg` if it is on `PATH`, otherwise `uvx` fetches the matching tagged version with no install step.
 
+**Claude Code**
+
+```bash
+claude plugin marketplace add WeightForge/herdr-agent-org
+claude plugin install agent-org@herdr-agent-org
+```
+
+(Inside a session: `/plugin marketplace add WeightForge/herdr-agent-org`, then `/plugin install agent-org@herdr-agent-org`.)
+
+**Codex**
+
+```bash
+codex plugin marketplace add WeightForge/herdr-agent-org
+codex plugin add agent-org@herdr-agent-org
+```
+
+**Antigravity (`agy`)** installs from a plugin directory, so clone first:
+
+```bash
+git clone https://github.com/WeightForge/herdr-agent-org
+agy plugin install herdr-agent-org/src/agentorg/data
+```
+
+Then ask your agent to bootstrap an organization for your project (`agent-org-bootstrap`), or run the CLI yourself:
+
+```bash
 cd /path/to/your-project               # an existing Git repository
 agentorg init --template engineering --name my-project
 ```
+
+### Manual / CLI-first
+
+```bash
+pip install herdr-agent-org
+agentorg install --target both        # skills for Claude Code and Codex (also: claude | codex | antigravity | all)
+```
+
+Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg`.
 
 Profiles are local aliases: an executable, an optional config directory (`--config-dir`, e.g. a separate `CLAUDE_CONFIG_DIR`) and a public model/effort. No key is stored. The CLI must already be installed and logged in.
 
