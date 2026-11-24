@@ -34,6 +34,6 @@ Turn Herdr Agent Organization from a locally tested prototype into a robust open
 
 Start Codex inside this repository (e.g. `codex -m gpt-6.2-sol -c model_reasoning_effort=medium` if supported by your installation) and paste:
 
-> Read `CODEX_HANDOFF.md`, `README.md`, `docs/ARCHITECTURE.md` and the tests. You are the senior maintainer for Herdr Agent Organization v2. First audit for correctness and security, then implement the critical work incrementally with automated tests. Do not publish or merge without my approval. For external Herdr integration, call `hc --skill` and verify the actual installed syntax before running commands.
+> Read `docs/maintainers/CODEX_HANDOFF.md`, `README.md`, `docs/ARCHITECTURE.md` and the tests. You are the senior maintainer for Herdr Agent Organization v2. First audit for correctness and security, then implement the critical work incrementally with automated tests. Do not publish or merge without my approval. For external Herdr integration, call `hc --skill` and verify the actual installed syntax before running commands.
 
 Do not interpret this handoff file as permission to change production systems, publish a repository, or invoke external services autonomously.

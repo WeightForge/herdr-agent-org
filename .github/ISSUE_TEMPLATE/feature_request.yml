@@ -1,0 +1,21 @@
+name: Feature request
+about: Suggest an improvement (describe the use case, not only the solution)
+title: '[Feature] '
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Anything that starts processes, spends money or publishes must stay behind an explicit approval.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: OS, Python, hc --version

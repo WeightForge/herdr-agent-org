@@ -1,3 +1,10 @@
+## Unreleased - documentation and packaging
+- README rewritten (new structure, worked example, command reference, Mermaid diagram); Thai README aligned; language switch links.
+- `CODEX_HANDOFF.md` and `PUBLISHING.md` moved to `docs/maintainers/`.
+- Added pull request template and feature request template; CONTRIBUTING gains a dev setup and the no-AI-trailer commit rule.
+- PyPI metadata (classifiers, project URLs) and a tag-triggered `release.yml` using Trusted Publishing; setup documented in `docs/maintainers/PUBLISHING.md`.
+- No runtime changes.
+
 ## 0.5.0 - protocol and status
 - `data/PROTOCOL.md` (Protocol version 1) is the single source of the file layout, escalation codes, task lifecycle and safety rules; `init` / `team up --apply` copy it to `.ai/PROTOCOL.md` (non-destructive). Launch prompts and skills point to it instead of repeating it.
 - Task lifecycle with one writer per state: dispatched, acknowledged, started (worker `ACK` recorded by the reviewer), in_review, done, blocked, cancelled, reassigned. Recovery re-sends to the worker when acknowledged without a worker ack.

@@ -6,13 +6,29 @@ build-backend = "setuptools.build_meta"
 name = "herdr-agent-org"
 version = "0.5.0"
 description = "Reusable, profile-aware AI organizations for Herdr App and herdr-core"
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Community contributors" }]
 keywords = ["herdr", "claude-code", "codex", "ai-agents", "orchestration", "skills"]
-classifiers = ["Programming Language :: Python :: 3", "Operating System :: OS Independent"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/WeightForge/herdr-agent-org"
+Issues = "https://github.com/WeightForge/herdr-agent-org/issues"
+Changelog = "https://github.com/WeightForge/herdr-agent-org/blob/main/CHANGELOG.md"
 
 [project.scripts]
 agentorg = "agentorg.cli:main"
