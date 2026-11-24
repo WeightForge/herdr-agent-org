@@ -37,6 +37,7 @@ One giant PM prompt that dispatches, polls, relays review comments and remembers
 - Task lifecycle derived from files (`dispatched` to `done`), printed by `team status`, with the next actor named.
 - Six escalation codes, written to `.ai/inbox/`, so nothing depends on a message arriving.
 - Local-only provider profiles for `claude`, `codex` and `antigravity`; no credentials stored, no account fallback.
+- `team up --apply` from a Herdr App terminal shows the team as panes in your current tab (reviewers in a column, their workers to the right); `--no-panes` opts out.
 - Blocked-terminal reporting without copying prompt text.
 - Standard library only; Windows and Linux.
 
@@ -145,6 +146,7 @@ flowchart TD
 ```
 
 - `team up --apply` starts reviewers as children of the PM terminal and each worker with `--parent <its reviewer>`, so Herdr reports worker events (turn ended, blocked, exited) to the reviewer, and only reviewer escalations reach the PM.
+- From a Herdr App terminal, `team up --apply` also shows each role as a pane in the PM's tab: PM on the left, one row per reviewer with its workers to the right (`--no-panes` to skip).
 - Messages only point at files. A lost message loses nothing; the file is the record.
 - The PM reads `.ai/inbox/*.md` whenever it wakes. If the PM is outside Herdr, nothing is pushed and the inbox is the channel.
 - The full rules (file layout, states, escalation codes) are in [`PROTOCOL.md`](https://github.com/WeightForge/herdr-agent-org/blob/main/src/agentorg/data/PROTOCOL.md), copied to `.ai/PROTOCOL.md` in your project.

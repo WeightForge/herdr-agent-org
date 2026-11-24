@@ -4,6 +4,7 @@
 - Skills use a PATH `agentorg` only if it reports exactly the skill's version; otherwise the tag-pinned uvx fallback runs, so an older pip install is never mixed with newer skills.
 - `release.yml` now runs on a published GitHub Release (or manually), not on tag push: tagging makes the uvx pin resolvable, publishing to PyPI is a separate decision.
 - `tests/test_plugins.py` fails if manifest versions, the uvx pin and `__version__` drift.
+- `team up --apply` run from a Herdr App terminal shows the team as panes in the PM's tab (PM left, one row per reviewer with its workers to the right); best effort, idempotent, opt out with `--no-panes`; the JSON output gains `panes`.
 - Verified: `team smoke` passes when run through `uvx --from <repo>`.
 
 ## Documentation and packaging (0.5.x)

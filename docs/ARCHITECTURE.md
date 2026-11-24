@@ -23,6 +23,10 @@ PM (Claude Code or Codex + agent-org-manager skill)
 
 `team up --apply` starts reviewer roles first as children of the PM terminal, then each worker with `--parent <reviewer terminal>`. Herdr types worker notes (turn ended, blocked, exited) into the reviewer, so PM -> reviewers -> workers and the PM is woken only by reviewer escalations. The PM's `HC_TERMINAL_ID` (if valid) is passed to launched roles as `--pm` and recorded as `pm_terminal` in `.ai/RUNTIME.json`; it is deliberately not part of the role label fingerprint.
 
+## Panes
+
+When the PM runs in a Herdr App terminal, `team up --apply` then gives each role a pane in the PM's tab (`herdr-app do terminal.keep`, focusing the anchor pane first): reviewers go down a column, each reviewer's workers to its right. It is best effort and idempotent: panes that exist are skipped, a pane that lands outside the PM's tab is parked and arranging stops, and failures only warn. `--no-panes` disables it.
+
 ## Escalation inbox
 
 Reviewers write each escalation to `.ai/inbox/<UTC>-<task>-<code>-<hex4>.md` (git-ignored) and optionally `hc send` the PM a pointer. The PM reads the folder on every wake, moves handled files to `.ai/inbox/done/` and alone edits `.ai/STATE.md`.
