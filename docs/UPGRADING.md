@@ -9,7 +9,7 @@ Two versions matter: the package version (`agentorg --version`) and the `Protoco
 ## What an upgrade touches
 
 - **`.ai/TEAM.json`**: never rewritten by `init` or `team up`. `schema_version: 2` is unchanged in 0.5. New optional keys (for example `experimental` in the research and content templates) are not added to existing files.
-- **`.ai/PROTOCOL.md`**: `init` and `team up --apply` copy the packaged file. Identical: left alone. Older protocol version: replaced. Same or newer version but different content (you edited it): kept, with a warning on stderr. Delete it and re-run to get the packaged copy.
+- **`.ai/PROTOCOL.md`**: `init` and `team up --apply` copy the packaged file. agentorg owns this copy: any difference at the same or an older protocol version is overwritten (wording fixes ship without a version bump, so local edits are not preserved). A copy with a newer protocol version is kept, with a warning, so an older agentorg never downgrades a project. Running agents read the file when they start; restart them to pick up changes.
 - **Skills**: `agentorg install` copies skill folders to the Claude / Codex / Antigravity skill directories. An existing skill folder is skipped unless `--force`, which deletes and replaces the whole folder, so local edits to an installed skill are lost. Keep customizations elsewhere or re-apply them after `--force`. Skills carry no version number; after upgrading, run `agentorg install --force` if you have not customized them.
 - **Running agents**: launch prompts are fixed at start. After an upgrade, a live role keeps its old prompt until its terminal is stopped (`team down --apply`) and started again (`team up --apply`). Role terminals are reused only when their labels match.
 

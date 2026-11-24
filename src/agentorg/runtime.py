@@ -260,7 +260,11 @@ def _protocol_version(text: str) -> int:
 
 
 def install_protocol(project: Path) -> str:
-    """Copy the packaged PROTOCOL.md to .ai/PROTOCOL.md. Returns created|unchanged|updated|kept (kept: differs and not older)."""
+    """Copy the packaged PROTOCOL.md to .ai/PROTOCOL.md. Returns created|unchanged|updated|kept.
+
+    agentorg owns the copy, so any difference is overwritten (text fixes keep the same version);
+    only a copy with a NEWER protocol version is kept, to avoid downgrading a project.
+    """
     from importlib.resources import files
     packaged = files("agentorg").joinpath("data", "PROTOCOL.md").read_text(encoding="utf-8")
     dest = project / ".ai" / "PROTOCOL.md"
@@ -268,8 +272,8 @@ def install_protocol(project: Path) -> str:
         current = dest.read_text(encoding="utf-8")
         if current == packaged:  # read_text already normalizes CRLF
             return "unchanged"
-        if _protocol_version(current) >= _protocol_version(packaged):
-            print(f"WARNING: {dest} differs from the packaged protocol and is not older; left unchanged.", file=sys.stderr)
+        if _protocol_version(current) > _protocol_version(packaged):
+            print(f"WARNING: {dest} has a newer protocol version than this agentorg; left unchanged. Upgrade agentorg.", file=sys.stderr)
             return "kept"
         status = "updated"
     else:
