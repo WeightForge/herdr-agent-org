@@ -10,7 +10,7 @@ description: Initialize an AI organization for an existing software, research or
 3. Populate `.ai/PROJECT.md` and `.ai/ROADMAP.md` based on project evidence and owner constraints; template placeholders are **not** validated product requirements.
 4. Team config lives in `.ai/TEAM.json`; profile aliases live **outside Git** in the local user profile store. Check `agentorg profile list` then guide the user through `agentorg profile add <alias> --provider claude|codex|antigravity ...`. For CLI-authenticated accounts `--config-dir` selects `CLAUDE_CONFIG_DIR` or `CODEX_HOME`; do not ask for tokens/emails.
 5. Use `agentorg role set <role> --profile <alias> [--model ...] [--effort ...]` to assign exact providers. Run `agentorg doctor` and `agentorg team plan`; verify actual local model availability and corporate policy.
-6. For software worktrees commit the generated `.ai/TEAM.json` and project docs before `agentorg team up --apply` so new worktrees contain the shared instructions. Explicit permission to launch the team is required. Preview is safe and side-effect-free with respect to Herdr and worktrees.
+6. For software worktrees commit the generated `.ai/TEAM.json`, `.ai/PROTOCOL.md` and project docs before `agentorg team up --apply` so new worktrees contain the shared instructions. Explicit permission to launch the team is required. Preview is safe and side-effect-free with respect to Herdr and worktrees.
 7. Load `agent-org-manager` and add domain loop. On PM restart use `agent-org-recovery` rather than rebuilding from scratch.
 
 ## Unattended operation

@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from agentorg import config, runtime  # noqa: E402
 
 SKILLS = ROOT / "src" / "agentorg" / "data" / "skills"
+PROTOCOL = ROOT / "src" / "agentorg" / "data" / "PROTOCOL.md"
 TASK = ("Reply with the exact messages and commands you would send next, in order, inside ONE fenced code block, "
         "one per line, each as `RUN: <command>` or `SEND <target>: <message>` or `WRITE <path>: <content>`. "
         "Finish the block with the line `END TURN` if you would then stop and wait to be woken. Only that block is graded. Do not execute anything, call tools or touch files; this is an offline exercise.")
@@ -73,7 +74,9 @@ def build_prompt(scenario: dict, proj: Path, doc: dict, subs: dict) -> str:
     situation = scenario["situation"]
     for key, value in subs.items():
         situation = situation.replace(key, value)
-    return f"=== YOUR ROLE ===\n{role}\n\n=== LOADED SKILLS ===\n{skills}\n\n=== SITUATION ===\n{situation}\n\n=== TASK ===\n{TASK}"
+    # The agent cannot read files in this offline exercise, so the protocol its prompt points to is inlined.
+    protocol = PROTOCOL.read_text(encoding="utf-8")
+    return f"=== YOUR ROLE ===\n{role}\n\n=== .ai/PROTOCOL.md ===\n{protocol}\n\n=== LOADED SKILLS ===\n{skills}\n\n=== SITUATION ===\n{situation}\n\n=== TASK ===\n{TASK}"
 
 
 def main(argv=None) -> int:

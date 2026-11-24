@@ -1,0 +1,22 @@
+{
+  "name": "pm_cancels_task_in_flight",
+  "role": "pm",
+  "skills": [
+    "agent-org-manager",
+    "agent-org-engineering"
+  ],
+  "situation": "The owner tells you task T-9 (in flight: progress.md says State: started) is no longer wanted. The worker is backend-worker, its reviewer is technical-reviewer (terminal @REVIEWER@). The root checkout is /work/demo. Cancel T-9.",
+  "must_match": [
+    "WRITE\\s+\\S*/work/demo/\\.ai/tasks/T-9/cancel",
+    "agentorg team send backend-worker\\s+\\S*/work/demo/\\.ai/tasks/T-9/cancel",
+    "(agentorg team send technical-reviewer|hc send @REVIEWER@)\\s+\\S*/work/demo/\\.ai/tasks/T-9/cancel",
+    "END TURN"
+  ],
+  "must_not_match": [
+    "WRITE\\s+\\S*packet\\.md",
+    "WRITE\\s+\\S*progress\\.md",
+    "T-(?!9\\b)\\d+",
+    "--wait",
+    "hc keys"
+  ]
+}

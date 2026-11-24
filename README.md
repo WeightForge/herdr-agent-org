@@ -43,7 +43,11 @@ git commit -m "Configure agent organization"
 
 agentorg team up --apply          # explicit action: creates worktrees and Herdr agents
 agentorg team status
-agentorg team send backend-worker "Implement scoped task X; write tests; report changes and blockers."
+# Dispatch is packet + path only (see .ai/PROTOCOL.md): the PM writes .ai/tasks/T-1/packet.md, then sends the
+# worker AND its reviewer just that absolute path. Do not paste task text into `team send`.
+agentorg team send backend-worker "/abs/path/to/project/.ai/tasks/T-1/packet.md"
+agentorg team send technical-reviewer "/abs/path/to/project/.ai/tasks/T-1/packet.md"
+agentorg team status              # per-task state, next actor, unknown delivery, pending owner decisions
 ```
 
 **Important:** The sample `~/.claude-work` and `~/.claude-personal` directories must already exist and be authenticated; adjust them to your local paths. Model names/effort are user-configurable and must be supported by the installed CLI and account. `agentorg doctor` checks executables and directories, **not** an API's actual model entitlements. If you use only one personal Claude config, omit `--config-dir` for that profile. Environment-based API secrets are intentionally not managed by this project.
@@ -69,7 +73,7 @@ After `agentorg install --target both` the skills are copied to `~/.claude/skill
 
 > Use the `agent-org-manager` and `agent-org-engineering` skills. Read `.ai/PROJECT.md`, `.ai/TEAM.json`, `.ai/ROADMAP.md`, `.ai/STATE.md` and `QUESTION.md`; run `hc --skill`, `agentorg doctor` and `agentorg team plan`. Reconcile Herdr, Git and PR state. After I approve the execution plan, use `agentorg team up --apply`. Work within the documented scope and approval gates; do not merge, publish or deploy automatically.
 
-For research or content, use only `agent-org-manager` plus relevant domain criteria; the starter templates intentionally omit software-specific PR rules.
+For research or content, use only `agent-org-manager` plus relevant domain criteria; the starter templates intentionally omit software-specific PR rules. **Supported team: PM + worker + reviewer for software. The research and content templates are experimental** (`"experimental": true`, shown by `team plan`).
 
 ## Commands
 

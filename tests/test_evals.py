@@ -79,6 +79,31 @@ class EvalGraderTest(unittest.TestCase):
             self.assertTrue(run.grade(good, s, SUBS)["pass"], (name, run.grade(good, s, SUBS)))
             self.assertFalse(run.grade(bad, s, SUBS)["pass"], name)
 
+    def test_v05_scenarios_grade_good_and_bad(self):
+        pk = "/work/demo/.ai/tasks/T-7/packet.md"
+        cx = "/work/demo/.ai/tasks/T-9/cancel"
+        cases = {
+            "pm_restart_acknowledged_no_worker_ack": (
+                f"```text\nRUN: agentorg team send backend-worker {pk}\nEND TURN\n```",
+                f"```text\nRUN: agentorg team send backend-worker {pk}\nRUN: agentorg team send technical-reviewer {pk}\nEND TURN\n```"),
+            "pm_cancels_task_in_flight": (
+                f"```text\nWRITE {cx}: owner cancelled\nRUN: agentorg team send backend-worker {cx}\nRUN: agentorg team send technical-reviewer {cx}\nEND TURN\n```",
+                "```text\nRUN: agentorg team send backend-worker T-9 stop\nEND TURN\n```"),
+        }
+        for name, (good, bad) in cases.items():
+            s = self.scenario(name)
+            self.assertTrue(run.grade(good, s, SUBS)["pass"], (name, run.grade(good, s, SUBS)))
+            self.assertFalse(run.grade(bad, s, SUBS)["pass"], name)
+
+    def test_every_scenario_prompt_inlines_protocol_and_fills_placeholders(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proj, doc, subs = run.project_context(Path(tmp))
+            for s in run.load_scenarios():
+                prompt = run.build_prompt(s, proj, doc, subs)
+                self.assertIn("Protocol version: 1", prompt, s["name"])
+                for token in subs:
+                    self.assertNotIn(token, prompt, s["name"])
+
     def test_prompt_contains_skill_role_and_situation(self):
         with tempfile.TemporaryDirectory() as tmp:
             proj, doc, subs = run.project_context(Path(tmp))

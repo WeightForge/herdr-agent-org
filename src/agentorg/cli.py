@@ -13,7 +13,8 @@ from . import __version__
 from .config import (OrgError, load_profiles, save_profiles, profiles_path, validate_id,
                      load_project, validate_project, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
 from .runtime import (blocked_info, redact_record, start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
-                      existing_terminal, run_process, validate_binaries, which, stop_team, inbox_pending)
+                      existing_terminal, run_process, validate_binaries, which, stop_team, inbox_pending,
+                      install_protocol, task_states, pending_owner_decisions)
 
 
 def add_parser() -> argparse.ArgumentParser:
@@ -118,7 +119,10 @@ def init_project(ns):
         else:
             p.write_text(content, encoding="utf-8", newline="\n")
             created.append(rel)
-    print(json.dumps({"project": str(root), "created": created, "already_present": skipped}, indent=2))
+    protocol = install_protocol(root)
+    if template.get("experimental"):
+        print(f"WARNING: the {ns.template} template is experimental; only the software team (PM + worker + reviewer) is supported.", file=sys.stderr)
+    print(json.dumps({"project": str(root), "created": created, "already_present": skipped, "protocol": protocol}, indent=2))
 
 
 def profile_cmd(ns):
@@ -260,7 +264,10 @@ def team_cmd(ns):
         for item, visible in zip(items, safe):
             if not (ns.op == "up" and ns.apply):
                 visible["argv"] = item["command"]
-        print(json.dumps({"mode": "apply" if ns.op == "up" and ns.apply else "dry_run", "roles": safe}, indent=2))
+        out = {"mode": "apply" if ns.op == "up" and ns.apply else "dry_run", "roles": safe}
+        if doc.get("experimental"):
+            out["experimental"] = True
+        print(json.dumps(out, indent=2))
         if ns.op == "up" and not ns.apply:
             print("No agents started. Add --apply to launch.")
         return
@@ -300,7 +307,8 @@ def team_cmd(ns):
         for s in status:
             runtime.setdefault("terminals", {}).setdefault(s["role"], {}).update({"name": s["terminal"], "live": s["live"]})
         write_json(root / ".ai" / "RUNTIME.json", runtime)
-    print(json.dumps({"project": doc["project_id"], "inbox_pending": inbox_pending(root), "blocked": blocked, "status": status}, indent=2))
+    print(json.dumps({"project": doc["project_id"], "inbox_pending": inbox_pending(root), "blocked": blocked,
+                      "owner_decisions": pending_owner_decisions(root), "tasks": task_states(root), "status": status}, indent=2))
 
 
 def main(argv=None):

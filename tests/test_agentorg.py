@@ -348,7 +348,7 @@ class TempOrgTest(unittest.TestCase):
         worker_prompt = runtime.make_agent_prompt(self.project, worker)
         reviewer_prompt = runtime.make_agent_prompt(self.project, reviewer)
         self.assertIn(reviewer_term, worker_prompt)
-        self.assertIn("without routing routine turns through PM", worker_prompt)
+        self.assertIn("not the PM", worker_prompt)
         self.assertIn("Do not wake PM for normal review rounds", reviewer_prompt)
 
     def test_reviewer_route_must_reference_enabled_reviewer(self):

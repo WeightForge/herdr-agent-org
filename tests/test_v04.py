@@ -4,6 +4,7 @@ import io
 import json
 import subprocess
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -94,11 +95,14 @@ class PromptTest(Fixture):
         self.init()
         doc = config.load_project(self.project)
         worker = runtime.make_agent_prompt(self.project, config.resolve_role(doc, "backend-worker"), "t7")
-        self.assertLess(worker.index("commit your report"), worker.index("hc send"))
+        self.assertLess(worker.index("Commit your report"), worker.index("hc send"))
         self.assertIn(".ai/handoff/TASK.md", worker)
         reviewer = runtime.make_agent_prompt(self.project, config.resolve_role(doc, "technical-reviewer"), "t7")
-        for text in ("progress.md", "blocked_by", "known task id", "git show COMMIT:.ai/handoff/TASK.md", "HEX4"):
+        for text in ("progress.md", "HEX4"):
             self.assertIn(text, reviewer)
+        protocol = Path(runtime.__file__).parent.joinpath("data", "PROTOCOL.md").read_text(encoding="utf-8")
+        for text in ("blocked_by", "git show <commit>:.ai/handoff/<task>.md", "<hex4>"):
+            self.assertIn(text, protocol)
 
     def test_init_state_has_handled_escalations_and_tasks_not_ignored(self):
         self.init()

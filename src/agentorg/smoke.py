@@ -151,7 +151,8 @@ def _run_checks(ctx: dict, report: dict, keep: bool) -> None:
         _need(_wait(f.exists, 20), "reviewer fake agent never recorded its launch")
         prompt = json.loads(f.read_text(encoding="utf-8"))["prompt"]
         _need(f"hc send {state['pm_id']}" in prompt, "reviewer prompt lacks `hc send <pm id>`")
-        return "prompt addresses the PM terminal"
+        _need("PROTOCOL.md" in prompt and (proj / ".ai" / "PROTOCOL.md").is_file(), "team up did not install .ai/PROTOCOL.md or prompt omits it")
+        return "prompt addresses the PM terminal and points to .ai/PROTOCOL.md"
 
     def worker_no_daemon():
         _need_pm()
