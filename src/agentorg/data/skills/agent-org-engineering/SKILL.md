@@ -5,6 +5,11 @@ description: Reviewer-led multi-agent software engineering loop using Herdr and 
 
 # Engineering loop — Worker heavy, Reviewer next, PM light
 
+## Running the CLI
+
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: if `agentorg --version` works, use `agentorg`; otherwise run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither `agentorg` nor `uvx` exists, ask the user to install `uv` or `pip install herdr-agent-org`. The tag keeps the CLI on the same version as this skill.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.6.0`. tests/test_plugins.py checks the pin against __version__. -->
+
 Use existing repository build/test/security/contribution instructions as source of truth. A good engineering loop minimizes PM calls, noisy PRs, duplicated agents and branch conflicts.
 
 **Read `.ai/PROTOCOL.md` (absolute path in your launch prompt) first.** It is authoritative for the file layout, task states, `ACK`, dependencies, cancellation, escalation codes and format, handoffs and the rule against answering another agent's permission prompt. This skill adds only role guidance.

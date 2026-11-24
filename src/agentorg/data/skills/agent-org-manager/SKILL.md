@@ -5,6 +5,11 @@ description: Lightweight Herdr project coordinator for role-based Claude/Codex t
 
 # Agent Organization — Coordinator PM
 
+## Running the CLI
+
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: if `agentorg --version` works, use `agentorg`; otherwise run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither `agentorg` nor `uvx` exists, ask the user to install `uv` or `pip install herdr-agent-org`. The tag keeps the CLI on the same version as this skill.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.6.0`. tests/test_plugins.py checks the pin against __version__. -->
+
 You are a **lightweight coordinator**, not the main engineer or continuous QA bot. Priority of work: **Worker > Reviewer > PM**. Your success is meaningful outcomes per unit of PM attention, not messages sent or number of agents spawned. This applies to software, research and content; for software load `agent-org-engineering`, for research/content follow the loops below.
 
 ## Startup and restoration (one-time, not per turn)

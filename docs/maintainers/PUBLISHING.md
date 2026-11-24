@@ -36,3 +36,9 @@ One-time setup (owner):
 Per release: bump `version` in `pyproject.toml` and `src/agentorg/__init__.py`, update `CHANGELOG.md`, merge, then `git tag vX.Y.Z && git push origin vX.Y.Z`. PyPI versions cannot be re-uploaded, so check the build first (`python -m pip wheel . --no-deps -w dist`).
 
 README links are absolute GitHub URLs (on `main`) so they work on the PyPI page; the Mermaid diagram does not render on PyPI, only on GitHub.
+
+## Plugin release (tag-pinned uvx)
+
+The plugin skills run the CLI with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@vX.Y.Z agentorg`, so pushing tag `vX.Y.Z` is what makes the pin resolvable; a PyPI release is optional. Note that `release.yml` also triggers on that tag and will fail harmlessly if PyPI Trusted Publishing is not set up.
+
+Per release, bump the version in `pyproject.toml`, `src/agentorg/__init__.py`, the three `plugin.json` files under `src/agentorg/data/`, `.claude-plugin/marketplace.json`, and the `@vX.Y.Z` pin in each `src/agentorg/data/skills/*/SKILL.md`. `tests/test_plugins.py` checks that they agree. Once the package is on PyPI the pin may become `uvx herdr-agent-org==X.Y.Z`; update the test with it.

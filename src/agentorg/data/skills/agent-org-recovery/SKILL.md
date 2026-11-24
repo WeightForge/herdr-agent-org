@@ -5,6 +5,11 @@ description: Recover a PM/team after Claude/Codex context loss, app restart, mac
 
 # Agent Organization — Recovery
 
+## Running the CLI
+
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: if `agentorg --version` works, use `agentorg`; otherwise run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither `agentorg` nor `uvx` exists, ask the user to install `uv` or `pip install herdr-agent-org`. The tag keeps the CLI on the same version as this skill.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.6.0`. tests/test_plugins.py checks the pin against __version__. -->
+
 **Never treat a stale checkpoint as proof of active agents or finished tasks.** Read `.ai/STATE.md` / `.ai/RUNTIME.json` then use `agentorg team reconcile`, `hc ls`, `hc get`, and current Git worktrees/branches/PR/CI to determine truth.
 
 1. Identify working directory, project ID, environment and accounts. Validate company/personal data routing.

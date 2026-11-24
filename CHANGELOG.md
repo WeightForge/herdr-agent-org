@@ -1,4 +1,10 @@
-## Unreleased - documentation and packaging
+## 0.6.0 - plugins
+- Installable as a plugin for Claude Code, Codex and Antigravity: manifests live in `src/agentorg/data/` (the plugin root, next to the single canonical `skills/` copy); marketplaces at `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`.
+- Skills resolve the CLI once: `agentorg` if on `PATH`, else `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.6.0 agentorg`.
+- `tests/test_plugins.py` fails if manifest versions, the uvx pin and `__version__` drift.
+- Verified: `team smoke` passes when run through `uvx --from <repo>`.
+
+## Documentation and packaging (0.5.x)
 - README rewritten (new structure, worked example, command reference, Mermaid diagram); Thai README removed (the repository is English-only).
 - `CODEX_HANDOFF.md` and `PUBLISHING.md` moved to `docs/maintainers/`.
 - Added pull request template and feature request template; CONTRIBUTING gains a dev setup and the no-AI-trailer commit rule.
