@@ -1,25 +1,27 @@
 <div align="center">
 
-# agentorg
+<img src="https://raw.githubusercontent.com/WeightForge/herdr-agent-org/main/assets/logo.png" alt="herdr-agent-org logo: a lead ram with a terminal prompt, followed by its team" width="160">
 
-**A reusable AI team for your repo: PM, reviewer and worker, running on Herdr.**
+# herdr-agent-org
 
-Your PM stays out of the loop: workers and reviewers finish the work, and you come back to what happened and who acts next.
+**A reusable AI team for your repo: PM, reviewers and workers, running on Herdr.**
+
+Start the team, go to sleep, and come back to finished work, a short list of questions only you can answer, and who acts next.
 
 [![tests](https://github.com/WeightForge/herdr-agent-org/actions/workflows/tests.yml/badge.svg)](https://github.com/WeightForge/herdr-agent-org/actions/workflows/tests.yml)
 [![PyPI](https://img.shields.io/pypi/v/herdr-agent-org)](https://pypi.org/project/herdr-agent-org/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://github.com/WeightForge/herdr-agent-org/blob/main/pyproject.toml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](https://github.com/WeightForge/herdr-agent-org/blob/main/LICENSE)
 
-[Quickstart](#quickstart) · [How it works](#how-it-works) · [Docs](#docs) · [Contributing](#contributing)
+[Quickstart](#quickstart) · [Full autonomy](#full-autonomy) · [Resume](#after-a-restart-agentorg-resume) · [How it works](#how-it-works) · [Docs](#docs)
 
 </div>
 
 ---
 
-`agentorg` is a small, dependency-free Python CLI plus four agent skills. It starts a **PM → reviewer → worker** team of Claude Code, Codex or Antigravity sessions on Herdr App and its `hc` CLI, gives each software worker its own Git worktree, and keeps all coordination in plain files under `.ai/`.
+`agentorg`, the CLI of herdr-agent-org, is a small, dependency-free Python tool plus four agent skills. It starts a **PM → reviewer → worker** team of Claude Code, Codex or Antigravity sessions on Herdr App and its `hc` CLI, gives each software worker its own Git worktree, and keeps all coordination in plain files under `.ai/`.
 
-> Status: pre-1.0. The unit tests use mocks. The `team smoke` command exercises a live Herdr core with fake agents. Treat the setup as a careful beta and read [Safety](#safety-model) first.
+> Status: pre-1.0. Unit tests mock `hc` and the providers; each release is also run live on Herdr with real agents (see the [changelog](https://github.com/WeightForge/herdr-agent-org/blob/main/CHANGELOG.md) for what was verified and what was not). Treat it as a careful beta and read [Safety](#safety-model) first.
 
 ## Why
 
@@ -31,6 +33,9 @@ One giant PM prompt that dispatches, polls, relays review comments and remembers
 
 ## Features
 
+- One-question setup: the PM reads your repo and proposes a team with real job titles, accounts, models and effort; one "yes" starts it.
+- Full autonomy: agents work without permission prompts inside the project, park owner decisions in `QUESTION.md` and keep going; `team watch` wakes the PM when work stalls.
+- `agentorg resume`: after a restart every agent comes back in its own Herdr pane with its own conversation.
 - Dry-run by default; nothing starts without `team up --apply`.
 - One Git worktree and branch per software worker.
 - Path-only dispatch: agents get a file path, never pasted task text.
@@ -275,7 +280,7 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 
 ## Troubleshooting and FAQ
 
-**An agent is stuck on a permission prompt.** `agentorg team status` shows it under `blocked`. Approve it yourself in that terminal. For unattended runs, allow only the needed `hc` commands in each provider's own settings, with exact targets where supported (for example Claude Code `Bash(hc send ao-my-project-*)`, `Bash(hc read:*)`, `Bash(hc get:*)`, `Bash(hc ls:*)`). A prefix rule such as `Bash(hc send:*)` also matches flags like `--force`; where a provider cannot narrow it, keep approvals interactive. Folder trust for each worktree stays a human decision. See [Architecture](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/ARCHITECTURE.md).
+**An agent is stuck on a permission prompt.** `agentorg team status` shows it under `blocked`. With `"autonomy": "full"` agents launch without permission prompts and the PM or a reviewer answers a first-run folder trust prompt; your own PM's first trust prompt is yours. In `supervised` mode approve it yourself in that terminal. For unattended supervised runs, allow only the needed `hc` commands in each provider's own settings, with exact targets where supported (for example Claude Code `Bash(hc send ao-my-project-*)`, `Bash(hc read:*)`, `Bash(hc get:*)`, `Bash(hc ls:*)`). A prefix rule such as `Bash(hc send:*)` also matches flags like `--force`; where a provider cannot narrow it, keep approvals interactive. Folder trust for each worktree stays a human decision. See [Architecture](https://github.com/WeightForge/herdr-agent-org/blob/main/docs/ARCHITECTURE.md).
 
 **Why does Codex launch with `--no-daemon`?** `hc --skill` requires it; otherwise Codex commands run outside `hc`. Codex roles get the label `nodaemon=1`. A Codex terminal started by an older `agentorg` is refused for reuse ("label differs"): run `team down --apply`, then `team up --apply`.
 
@@ -301,7 +306,8 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 
 ## Roadmap
 
-- Event-driven watcher with a persistent checkpoint (today the PM wakes on reviewer escalations and `hc` notes; there is no background supervisor).
+- Wake the PM when the owner answers `QUESTION.md` while every task is parked (today you tell the PM).
+- Live-verify Claude and Codex resume and a real Windows reboot.
 - More live testing across Windows, Linux and Herdr versions.
 - Enforce `max_parallel_workers` (currently PM policy, not a process cap).
 - CI/PR adapters and mature research/content templates.
@@ -312,4 +318,4 @@ Issues and PRs are welcome. Start with [CONTRIBUTING.md](https://github.com/Weig
 
 ## License
 
-[Apache-2.0](https://github.com/WeightForge/herdr-agent-org/blob/main/LICENSE). Not affiliated with Herdr, Anthropic or OpenAI.
+[Apache-2.0](https://github.com/WeightForge/herdr-agent-org/blob/main/LICENSE). Not affiliated with Herdr, Anthropic or OpenAI. The logo is adapted from the ram in [Herdr's logo](https://github.com/herdrdev/herdr/blob/HEAD/assets/logo.svg) (Apache-2.0).
