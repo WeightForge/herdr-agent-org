@@ -8,9 +8,11 @@ import re
 import shutil
 import subprocess
 import sys
+import shlex
 import time
+import uuid
 from pathlib import Path
-from .config import autonomy, check_safe_text, OrgError, read_json, write_json, org_home, load_project, load_profiles, resolve_profile, resolve_role
+from .config import autonomy, check_safe_text, OrgError, read_json, write_json, org_home, register_project, load_project, load_profiles, resolve_profile, resolve_role
 
 
 STALE_MINUTES = 20
@@ -191,16 +193,22 @@ def redact_record(record):
     return {**record, "status": {k: v for k, v in status.items() if k != "msg"}}
 
 
-def role_launch_cmd(project: Path, role: dict, cwd: Path) -> list[str]:
+def role_launch_cmd(project: Path, role: dict, cwd: Path, session: str | None = None, resume: str | None = None) -> list[str]:
+    """session: new Claude session id to set; resume: provider session id (or "last") to reopen instead of a fresh prompt."""
     name = terminal_name(project, role["id"])
     labels = role_labels(project, role)
-    command = ["hc", "run", "--bg", "--name", name, "--cwd", str(cwd), "--outlive-parent"]
+    # --keep: if the program is lost (host shutdown, signal) herdr-core leaves a shell in the same terminal, so the pane survives.
+    command = ["hc", "run", "--bg", "--keep", "--name", name, "--cwd", str(cwd), "--outlive-parent"]
     # A paired worker is a child of its reviewer, so worker notes reach the reviewer, not the PM.
     if role.get("mode") == "worker" and role.get("reviewer_role"):
         command.extend(["--parent", terminal_name(project, role["reviewer_role"])])
     for key, value in labels.items():
         command.extend(["--label", f"{key}={value}"])
     command += [sys.executable, "-m", "agentorg", "_launch", "--project", str(project), "--role", role["id"], "--profile-store", str(org_home())]
+    if session:
+        command += ["--session-id", session]
+    if resume:
+        command += ["--resume", resume]
     pm = pm_terminal()
     return command + ["--pm", pm] if pm else command
 
@@ -221,6 +229,7 @@ def start_team(project: Path, *, apply: bool = False, panes: bool = True, report
     if apply:
         hc_ready()
         install_protocol(project)
+        register_project(project)
     result = []
     runtime = read_json(project / ".ai" / "RUNTIME.json", default={"schema_version": 2, "terminals": {}})
     if apply and pm_terminal():
@@ -231,7 +240,9 @@ def start_team(project: Path, *, apply: bool = False, panes: bool = True, report
         cwd = project
         if doc["kind"] == "software" and role["mode"] == "worker" and doc.get("policies", {}).get("isolate_worker_worktrees", True):
             cwd = ensure_worktree(project, role) if apply else worktree_info(project, role)[0]
-        cmd = role_launch_cmd(project, role, cwd)
+        provider = resolve_profile(role, profiles)["provider"]
+        session = str(uuid.uuid4()) if provider == "claude" else None
+        cmd = role_launch_cmd(project, role, cwd, session=session)
         name = terminal_name(project, role["id"])
         item = {"role": role["id"], "terminal": name, "cwd": str(cwd), "command": cmd, "action": "preview"}
         if apply:
@@ -245,7 +256,10 @@ def start_team(project: Path, *, apply: bool = False, panes: bool = True, report
                 # 124 may be an hc check-in timeout: do not relaunch; inspect its terminal.
                 item["action"] = "launched" if spawned.returncode == 0 else "verify-terminal"
                 item["output"] = (spawned.stdout or "")[-400:]
-            runtime.setdefault("terminals", {})[role["id"]] = {"name": name, "cwd": str(cwd), "status": item["action"]}
+            entry = runtime.setdefault("terminals", {}).setdefault(role["id"], {})
+            entry.update({"name": name, "cwd": str(cwd), "status": item["action"], "provider": provider, "profile": role["profile"]})
+            if item["action"] != "reused":  # a reused terminal keeps the session it already runs
+                entry.update({"session_id": session, "launched_at": time.time()})
             write_json(project / ".ai" / "RUNTIME.json", runtime)
         result.append(item)
     if apply and report is not None:
@@ -274,12 +288,12 @@ def _herdr_do(*args):
     return r.stdout
 
 
-def arrange_panes(project: Path, results: list) -> dict:
+def arrange_panes(project: Path, results: list, pm: str | None = None) -> dict:
     """Show the team as panes in the PM's tab: reviewers down a column, each one's workers to its right.
 
     Best effort: any failure warns on stderr and leaves the rest of the team hidden but working.
     """
-    pm = pm_terminal()
+    pm = pm or pm_terminal()
     if not pm or not which("herdr-app"):
         return {"arranged": [], "skipped": "no PM terminal or no herdr-app"}
     arranged = []
@@ -594,15 +608,10 @@ def make_agent_prompt(project: Path, role: dict, pm: str | None = None) -> str:
             "For now, read project context and wait for task assignment; don't modify project files proactively.")
 
 
-def launch_agent_process(project: Path, role_id: str, pm: str | None = None):
-    doc = load_project(project)
-    role = resolve_role(doc, role_id)
-    profile = resolve_profile(role, load_profiles())
-    provider = profile["provider"]
+def _provider_env(provider: str, config_dir: str | None) -> dict:
     env = os.environ.copy()
-    config_dir = profile.get("config_dir")
     if provider == "antigravity":
-        if config_dir or profile.get("native_profile"):
+        if config_dir:
             raise OrgError("antigravity profiles support neither config_dir nor native_profile")
     elif provider == "claude":
         if config_dir:
@@ -618,25 +627,247 @@ def launch_agent_process(project: Path, role_id: str, pm: str | None = None):
             env["CODEX_HOME"] = config_dir
         else:
             env.pop("CODEX_HOME", None)
-    model = role.get("model") or profile.get("model")
-    effort = role.get("effort") or profile.get("effort")
-    cmd = [profile["command"]] + (["--no-daemon"] if provider == "codex" else [])  # hc --skill: else commands run outside hc
-    if autonomy(doc) == "full":
-        cmd.append("--dangerously-bypass-approvals-and-sandbox" if provider == "codex" else "--dangerously-skip-permissions")
-    if profile.get("native_profile"):
-        if provider != "codex":
-            raise OrgError("native_profile is only supported for Codex")
-        cmd.extend(["--profile", profile["native_profile"]])
-    if model:
-        cmd.extend(["-m", model] if provider == "codex" else ["--model", model])
-    if effort:
-        cmd.extend(["-c", f"model_reasoning_effort={effort}"] if provider == "codex" else ["--effort", effort])
-    prompt = make_agent_prompt(project, role, pm_terminal(pm or "") if pm else None)
-    # agy rejects a positional prompt; -i starts an interactive session with it.
-    cmd.extend(["-i", prompt] if provider == "antigravity" else [prompt])
+    return env
+
+
+def _resume_cmd(provider: str, command: str, flags: list, session: str, prompt: str | None = None) -> list[str]:
+    """Reopen a provider conversation: an id, or "last" (most recent in the cwd) when none was recorded."""
+    last = session == "last"
+    if provider == "codex":
+        return [command, "resume", *flags, "--last" if last else session] + ([prompt] if prompt else [])
+    if provider == "claude":
+        return [command, *flags, *(["--continue"] if last else ["--resume", session])] + ([prompt] if prompt else [])
+    return [command, *flags, *(["--continue"] if last else ["--conversation", session])] + (["-i", prompt] if prompt else [])
+
+
+def _run_provider(cmd: list, env: dict):
     # Resolve npm .cmd shims (Windows) that bare CreateProcess cannot find.
     cmd[0] = which(cmd[0]) or cmd[0]
     # No shell and no token arguments. Provider CLIs inherit the terminal TTY.
     if os.name != "nt":
         os.execvpe(cmd[0], cmd, env)
     return subprocess.run(cmd, env=env, check=False).returncode
+
+
+def launch_agent_process(project: Path, role_id: str, pm: str | None = None, session: str | None = None, resume: str | None = None):
+    doc = load_project(project)
+    role = resolve_role(doc, role_id)
+    profile = resolve_profile(role, load_profiles())
+    provider = profile["provider"]
+    if provider == "antigravity" and profile.get("native_profile"):
+        raise OrgError("antigravity profiles support neither config_dir nor native_profile")
+    env = _provider_env(provider, profile.get("config_dir"))
+    model = role.get("model") or profile.get("model")
+    effort = role.get("effort") or profile.get("effort")
+    flags = ["--no-daemon"] if provider == "codex" else []  # hc --skill: else commands run outside hc
+    if autonomy(doc) == "full":
+        flags.append("--dangerously-bypass-approvals-and-sandbox" if provider == "codex" else "--dangerously-skip-permissions")
+    if profile.get("native_profile"):
+        if provider != "codex":
+            raise OrgError("native_profile is only supported for Codex")
+        flags.extend(["--profile", profile["native_profile"]])
+    if model:
+        flags.extend(["-m", model] if provider == "codex" else ["--model", model])
+    if effort:
+        flags.extend(["-c", f"model_reasoning_effort={effort}"] if provider == "codex" else ["--effort", effort])
+    if resume:
+        return _run_provider(_resume_cmd(provider, profile["command"], flags, resume), env)
+    if provider == "claude" and session:
+        flags.extend(["--session-id", session])
+    prompt = make_agent_prompt(project, role, pm_terminal(pm or "") if pm else None)
+    # agy rejects a positional prompt; -i starts an interactive session with it.
+    return _run_provider([profile["command"], *flags, *(["-i", prompt] if provider == "antigravity" else [prompt])], env)
+
+
+# ---- sessions and resume ------------------------------------------------------------------------------------------
+
+SHELLS = {"powershell", "pwsh", "cmd", "bash", "sh", "zsh", "dash", "fish"}
+SESSION_RE = re.compile(r"[A-Za-z0-9._-]{1,80}")
+PM_WAKE = ("The machine was restarted and the team was resumed in its original panes. Run the agent-org-recovery skill: "
+           "agentorg team status, read QUESTION.md and .ai/inbox, restart the watcher (agentorg team watch --loop), then continue.")
+PROVIDER_COMMAND = {"claude": "claude", "codex": "codex", "antigravity": "agy"}
+
+
+def _same_path(a, b) -> bool:
+    return os.path.normcase(os.path.normpath(str(a))) == os.path.normcase(os.path.normpath(str(b)))
+
+
+def _birth(st) -> float:
+    return getattr(st, "st_birthtime", None) or (st.st_ctime if os.name == "nt" else st.st_mtime)
+
+
+def find_session(provider: str, cwd, config_dir, since: float, claimed: set, newest: bool = False) -> str | None:
+    """Best-effort id of a provider conversation that no role has claimed. Reads names, times and the first line's id/cwd only.
+
+    shortcut: Codex matches by cwd and time; agy keeps no cwd on disk, so it takes the earliest conversation created
+    since launch (newest=True: the most recently written one, for a PM that is running right now). Verify with a live run.
+    """
+    home = Path(config_dir) if config_dir else Path.home() / (".claude" if provider == "claude" else ".codex")
+    found = []
+    if provider == "claude":
+        slug = re.sub(r"[^A-Za-z0-9]", "-", str(cwd))
+        found = [(f.stat().st_mtime, f.stem) for f in (home / "projects" / slug).glob("*.jsonl")]
+    elif provider == "codex":
+        for f in (home / "sessions").glob("**/rollout-*.jsonl"):
+            try:
+                with f.open(encoding="utf-8-sig") as handle:
+                    meta = json.loads(handle.readline()).get("payload", {})
+                if _same_path(meta.get("cwd", ""), cwd):
+                    found.append((f.stat().st_mtime, meta["id"]))
+            except (OSError, ValueError, KeyError, AttributeError):
+                continue
+    else:
+        for f in (Path.home() / ".gemini" / "antigravity-cli" / "conversations").glob("*.db"):
+            found.append((f.stat().st_mtime if newest else _birth(f.stat()), f.stem))
+    found = sorted((t, i) for t, i in found if t >= since - 5 and i not in claimed and SESSION_RE.fullmatch(i))
+    if not found:
+        return None
+    return (found[0] if provider == "antigravity" and not newest else found[-1])[1]
+
+
+def _claimed(runtime: dict) -> set:
+    ids = {r.get("session_id") for r in runtime.get("terminals", {}).values()}
+    return ids | {(runtime.get("pm") or {}).get("session_id")}
+
+
+def discover_sessions(runtime: dict) -> bool:
+    """Fill session_id for Codex/agy roles launched without one. Returns True when runtime changed."""
+    profiles, changed = load_profiles(), False
+    pending = sorted((r.get("launched_at", 0), rid) for rid, r in runtime.get("terminals", {}).items()
+                     if r.get("provider") in ("codex", "antigravity") and not r.get("session_id") and r.get("cwd"))
+    for since, rid in pending:
+        rec = runtime["terminals"][rid]
+        sid = find_session(rec["provider"], rec["cwd"], (profiles.get(rec.get("profile")) or {}).get("config_dir"), since, _claimed(runtime))
+        if sid:
+            rec["session_id"], changed = sid, True
+    return changed
+
+
+def register_pm(project: Path, provider: str | None = None) -> dict:
+    """Record the calling PM's own provider session in RUNTIME.json (run by the PM, inside its session)."""
+    env = os.environ
+    if not provider:
+        provider = ("claude" if env.get("CLAUDECODE") or env.get("CLAUDE_CODE_SESSION_ID") else
+                    "codex" if env.get("CODEX_THREAD_ID") or env.get("CODEX_HOME") else None)
+        if not provider:
+            raise OrgError("Cannot detect the PM provider from the environment; pass --provider.")
+    config_dir = {"claude": env.get("CLAUDE_CONFIG_DIR"), "codex": env.get("CODEX_HOME")}.get(provider)
+    sid = env.get({"claude": "CLAUDE_CODE_SESSION_ID", "codex": "CODEX_THREAD_ID"}.get(provider, "")) or ""
+    runtime_file = project / ".ai" / "RUNTIME.json"
+    runtime = read_json(runtime_file, default={"schema_version": 2, "terminals": {}})
+    if not SESSION_RE.fullmatch(sid):
+        sid = find_session(provider, project, config_dir, 0, _claimed(runtime), newest=True)
+    if not sid:
+        raise OrgError("Could not find the PM's session id; resume will not be able to reopen the PM conversation.")
+    runtime["pm"] = {"provider": provider, "session_id": sid, "cwd": str(project), "config_dir": config_dir, "terminal": pm_terminal()}
+    if pm_terminal():
+        runtime["pm_terminal"] = pm_terminal()
+    write_json(runtime_file, runtime)
+    return {k: v for k, v in runtime["pm"].items() if k != "config_dir"}
+
+
+def resume_pm_process(project: Path):
+    pm = read_json(project / ".ai" / "RUNTIME.json").get("pm") or {}
+    provider = pm.get("provider")
+    if provider not in PROVIDER_COMMAND or not SESSION_RE.fullmatch(pm.get("session_id") or ""):
+        raise OrgError("No registered PM session; run agentorg pm register inside the PM first.")
+    flags = ["--no-daemon"] if provider == "codex" else []
+    cmd = _resume_cmd(provider, PROVIDER_COMMAND[provider], flags, pm["session_id"], PM_WAKE)
+    return _run_provider(cmd, _provider_env(provider, pm.get("config_dir")))
+
+
+def shell_kind(record) -> str | None:
+    """Shell now in the foreground of a terminal (hc get .foreground.name), else None."""
+    record = record.get("terminal", record) if isinstance(record, dict) else {}
+    fg = record.get("foreground")
+    if not isinstance(fg, dict):
+        return None
+    name = fg.get("name") or (fg.get("argv") or [""])[0]
+    stem = re.split(r"[\\/]", name)[-1].lower().removesuffix(".exe")
+    return stem if stem in SHELLS else None
+
+
+def shell_line(kind: str, argv: list) -> str:
+    """One command line quoted for the given shell."""
+    if kind in ("powershell", "pwsh"):
+        return "& " + " ".join("'" + a.replace("'", "''") + "'" for a in argv)
+    return subprocess.list2cmdline(argv) if kind == "cmd" else shlex.join(argv)
+
+
+def _entry_argv(project: Path, *tail) -> list[str]:
+    return [sys.executable, "-m", "agentorg", *tail, "--project", str(project), "--profile-store", str(org_home())]
+
+
+def resume_team(project: Path, *, apply: bool = False, panes: bool = True) -> list:
+    """Bring the team and the PM back after a restart, in their own terminals and conversations. Dry-run unless apply."""
+    doc = load_project(project)
+    hc_ready()
+    runtime_file = project / ".ai" / "RUNTIME.json"
+    runtime = read_json(runtime_file, default={"schema_version": 2, "terminals": {}})
+    if apply and discover_sessions(runtime):
+        write_json(runtime_file, runtime)
+    items, recreated = [], []
+    for role in sorted((r for r in doc["roles"] if r.get("enabled", True)), key=lambda r: r["mode"] != "reviewer"):
+        rid, name = role["id"], terminal_name(project, role["id"])
+        item = {"role": rid, "terminal": name}
+        items.append(item)
+        rec = runtime.get("terminals", {}).get(rid, {})
+        cwd = Path(rec["cwd"]) if rec.get("cwd") else project
+        session = rec.get("session_id") or ("last" if not _same_path(cwd, project) else None)  # a worker's worktree is its own cwd
+        try:
+            active = existing_terminal(name, role_labels(project, role))
+        except OrgError as exc:
+            item.update(action="skipped", reason=str(exc))
+            continue
+        if active is not None and not shell_kind(active):
+            item["action"] = "running"
+            continue
+        if session is None:
+            item.update(action="no_session", reason="no session id recorded; start it fresh with team up --apply")
+            continue
+        if active is None:
+            item.update(action="recreate", command=role_launch_cmd(project, role, cwd, resume=session))
+        else:
+            line = shell_line(shell_kind(active), _entry_argv(project, "_launch", "--role", rid, "--resume", session))
+            item.update(action="resume_in_shell", command=line)
+        if apply:
+            sent = (run_process(item["command"], cwd=project, timeout=45) if active is None
+                    else run_process(["hc", "send", name, item["command"]], timeout=30))
+            if sent.returncode not in (0, 124):
+                item.update(action="failed", reason=(sent.stderr or sent.stdout).strip()[:200])
+            elif active is None:
+                recreated.append(item)
+    if apply and recreated and panes:
+        arrange_panes(project, recreated, pm=pm_terminal(runtime.get("pm_terminal") or ""))
+    changed = any(i["action"] in ("recreate", "resume_in_shell") for i in items)
+    items.append(_resume_pm(project, runtime, changed, apply))
+    return items
+
+
+def _resume_pm(project: Path, runtime: dict, team_changed: bool, apply: bool) -> dict:
+    pm, rec = pm_terminal(runtime.get("pm_terminal") or ""), runtime.get("pm") or {}
+    item = {"role": "pm", "terminal": pm}
+    if not pm:
+        return {**item, "action": "skipped", "reason": "no PM terminal recorded; run agentorg pm register inside the PM"}
+    try:
+        active = existing_terminal(pm)
+    except OrgError as exc:
+        return {**item, "action": "skipped", "reason": str(exc)}
+    if active is None:
+        return {**item, "action": "pm_terminal_gone", "reason": "reopen the PM in Herdr App, then run agentorg pm register"}
+    kind = shell_kind(active)
+    if kind and not rec.get("session_id"):
+        return {**item, "action": "no_session", "reason": "PM session was never registered; reopen it by hand, then run agentorg pm register"}
+    if kind:
+        line = shell_line(kind, _entry_argv(project, "_resume_pm"))
+        item.update(action="resume_in_shell", command=line)
+    elif team_changed and _status(active) not in ("working", "blocked"):
+        line = PM_WAKE
+        item.update(action="wake_pm", command=line)
+    else:
+        return {**item, "action": "running"}
+    if apply:
+        sent = run_process(["hc", "send", pm, line], timeout=30)
+        if sent.returncode != 0:
+            item.update(action="failed", reason=(sent.stderr or sent.stdout).strip()[:200])
+    return item

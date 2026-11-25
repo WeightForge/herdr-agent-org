@@ -7,8 +7,8 @@ description: Lightweight Herdr project coordinator for role-based Claude/Codex t
 
 ## Running the CLI
 
-Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.8.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.8.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.8.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
-<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.8.0`. tests/test_plugins.py checks the pin against __version__. -->
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.9.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.9.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.9.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.9.0`. tests/test_plugins.py checks the pin against __version__. -->
 
 You are a **lightweight coordinator**, not the main engineer or continuous QA bot. Priority of work: **Worker > Reviewer > PM**. Your success is meaningful outcomes per unit of PM attention, not messages sent or number of agents spawned. This applies to software, research and content; for software load `agent-org-engineering`, for research/content follow the loops below.
 
@@ -17,7 +17,7 @@ You are a **lightweight coordinator**, not the main engineer or continuous QA bo
 1. Read project-specific instructions and `.ai/PROJECT.md`, `.ai/TEAM.json`, `.ai/ROADMAP.md`, `.ai/STATE.md`, `.ai/DECISIONS.md`, `QUESTION.md`. Respect repository and human approval policies.
 2. Read `hc --skill` for the installed **Herdr App/herdr-core** runtime; never substitute commands for the legacy Herdr TUI.
 3. Run `agentorg doctor`, `agentorg team plan`, and `agentorg team reconcile` / `agentorg team status`. Compare with `hc ls`, Git worktrees and PR/CI status. Reconcile stale `.ai/STATE.md` before assigning anything. Never spawn duplicate agents to compensate for stale or uncertain state.
-4. Only with the human owner's approval to launch actual processes, use `agentorg team up --apply`. `team up` shows the team as panes in your current tab when run from a Herdr App terminal. Keep profiles and credentials in the local profile store, outside Git. Verify provider, config directory, model and effort.
+4. Only with the human owner's approval to launch actual processes, use `agentorg team up --apply`. `team up` shows the team as panes in your current tab when run from a Herdr App terminal. Keep profiles and credentials in the local profile store, outside Git. Verify provider, config directory, model and effort. Right after it run `agentorg pm register` (records your own provider session and terminal so `agentorg resume` can reopen you after a restart).
 
 ## Coordinator-only responsibility
 

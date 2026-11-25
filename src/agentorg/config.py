@@ -31,6 +31,17 @@ def profiles_path() -> Path:
     return org_home() / "profiles.json"
 
 
+def known_projects() -> list:
+    return read_json(org_home() / "projects.json", default={"projects": []}).get("projects", [])
+
+
+def register_project(root: Path):
+    """Remember a project root so `agentorg resume --all` can find it. Local paths only."""
+    projects = known_projects()
+    if str(root.resolve()) not in projects:
+        write_json(org_home() / "projects.json", {"schema_version": 1, "projects": [*projects, str(root.resolve())]})
+
+
 def read_json(path: Path, *, default=None):
     if not path.exists():
         if default is not None:
