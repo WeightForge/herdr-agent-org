@@ -111,7 +111,7 @@ pip install herdr-agent-org
 agentorg install --target both        # skills for Claude Code and Codex (also: claude | codex | antigravity | all)
 ```
 
-Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.8.0 agentorg`.
+Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.9.0 agentorg`.
 
 Profiles are local aliases: an executable, an optional config directory (`--config-dir`, e.g. a separate `CLAUDE_CONFIG_DIR`) and a public model/effort. No key is stored. The CLI must already be installed and logged in.
 
@@ -166,6 +166,17 @@ New projects have `"autonomy": "full"` in `.ai/TEAM.json` (a project without the
 - `agentorg team watch --loop` wakes the PM when tasks go stale or every role is idle with open tasks. `team status` flags stale tasks.
 
 Set `"autonomy": "supervised"` in `.ai/TEAM.json` for the earlier behavior: you approve every prompt.
+
+## After a restart: agentorg resume
+
+Team terminals start with `hc run --keep`, so when the computer shuts down Herdr replaces each lost agent with a shell in the same pane. One command puts every agent back in its pane with its own conversation:
+
+```bash
+agentorg resume --apply          # this project; without --apply it only shows what it would do
+agentorg resume --all --apply    # every project recorded by `team up --apply`
+```
+
+For each role it types the provider's resume command into the pane (`claude --resume <id>`, `codex resume <id>`, `agy --conversation <id>`) with the same account, model, effort and autonomy flags as the original launch. A terminal that is gone entirely is recreated in its pane. The PM is resumed the same way once it has run `agentorg pm register`, and is told to run the recovery skill. Session ids live in the untracked `.ai/RUNTIME.json`: agentorg sets Claude ids itself; Codex and Antigravity ids are discovered best-effort, and a role with no known session is reported as `no_session` and left alone.
 
 ## How it works
 
@@ -244,6 +255,8 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 | `agentorg team send ROLE MESSAGE [--wait]` | `hc send` to a live role; use it for packet paths |
 | `agentorg team status` | Per-task state, inbox count, blocked terminals, owner decisions, live roles |
 | `agentorg team watch [--loop] [--interval N] [--stale-minutes M]` | One watchdog check (or a loop): `hc send` a wake-up to the PM (only when it is idle or done) when open tasks are stale or no role is working |
+| `agentorg resume [--all] [--apply]` | After a restart: reopen each agent in its original pane and conversation (dry run without `--apply`) |
+| `agentorg pm register [--model M] [--effort E]` | Run by the PM: record its own provider session, terminal, model and effort for `resume` |
 | `agentorg team reconcile` | Same as `status`, and refresh the untracked `.ai/RUNTIME.json` |
 | `agentorg team down [--apply] [--remove-worktrees]` | Dry run by default; stops only terminals whose labels match this project, workers first; worktree removal never uses `--force`, branches are kept |
 | `agentorg team smoke [--keep]` | Live check against a running Herdr core using fake agents; zero model tokens |

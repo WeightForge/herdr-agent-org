@@ -12,10 +12,11 @@ from pathlib import Path
 
 from . import __version__
 from .config import (OrgError, load_profiles, save_profiles, profiles_path, validate_id,
-                     load_project, validate_project, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
+                     load_project, validate_project, known_projects, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
 from .runtime import (blocked_info, redact_record, start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
                       existing_terminal, run_process, validate_binaries, which, stop_team, inbox_pending,
-                      install_protocol, task_states, pending_owner_decisions, watch_once, STALE_MINUTES)
+                      install_protocol, task_states, pending_owner_decisions, watch_once, STALE_MINUTES,
+                      resume_team, register_pm, resume_pm_process, discover_sessions)
 
 
 def add_parser() -> argparse.ArgumentParser:
@@ -100,6 +101,18 @@ def add_parser() -> argparse.ArgumentParser:
     a.add_argument("--path", default=".")
     a.add_argument("--wait", action="store_true")
 
+    q = sub.add_parser("resume", help="After a restart: bring the team and PM back in their own panes and conversations")
+    q.add_argument("--path", default=".")
+    q.add_argument("--all", action="store_true", help="Every project that team up --apply recorded")
+    q.add_argument("--apply", action="store_true", help="Required to actually restart agents")
+    q.add_argument("--no-panes", action="store_true")
+    q = sub.add_parser("pm", help="PM session bookkeeping")
+    q.add_argument("op", choices=("register",))
+    q.add_argument("--path", default=".")
+    q.add_argument("--provider", choices=("claude", "codex", "antigravity"), help="Only when it cannot be detected from the environment")
+    q.add_argument("--model", help="Your own model, so resume reopens you on it (else the provider default)")
+    q.add_argument("--effort", help="Your own reasoning effort, for the same reason")
+
     q = sub.add_parser("doctor", help="Check local availability (no provider API calls)")
     q.add_argument("--path", default=".")
     q = sub.add_parser("install", help="Install skills in Claude Code, Codex, and/or Antigravity")
@@ -110,6 +123,11 @@ def add_parser() -> argparse.ArgumentParser:
     q.add_argument("--role", required=True)
     q.add_argument("--profile-store", required=True, help=argparse.SUPPRESS)
     q.add_argument("--pm", help=argparse.SUPPRESS)
+    q.add_argument("--session-id", help=argparse.SUPPRESS)
+    q.add_argument("--resume", help=argparse.SUPPRESS)
+    q = sub.add_parser("_resume_pm", help=argparse.SUPPRESS)
+    q.add_argument("--project", required=True)
+    q.add_argument("--profile-store", required=True, help=argparse.SUPPRESS)
     return p
 
 
@@ -432,9 +450,25 @@ def team_cmd(ns):
         runtime = read_json(root / ".ai" / "RUNTIME.json", default={"schema_version": 2, "terminals": {}})
         for s in status:
             runtime.setdefault("terminals", {}).setdefault(s["role"], {}).update({"name": s["terminal"], "live": s["live"]})
+        discover_sessions(runtime)
         write_json(root / ".ai" / "RUNTIME.json", runtime)
     print(json.dumps({"project": doc["project_id"], "inbox_pending": inbox_pending(root), "blocked": blocked,
                       "owner_decisions": pending_owner_decisions(root), "tasks": task_states(root, getattr(ns, "stale_minutes", STALE_MINUTES)), "status": status}, indent=2))
+
+
+def resume_cmd(ns):
+    roots = [rootpath(p) for p in known_projects() if (Path(p) / ".ai" / "TEAM.json").exists()] if ns.all else [rootpath(ns.path)]
+    out = []
+    for root in roots:
+        try:
+            out.append({"project": str(root), "roles": resume_team(root, apply=ns.apply, panes=not ns.no_panes)})
+        except OrgError as exc:
+            if not ns.all:
+                raise
+            out.append({"project": str(root), "error": str(exc)})
+    print(json.dumps({"mode": "apply" if ns.apply else "dry_run", "projects": out}, indent=2))
+    if not ns.apply:
+        print("Nothing restarted. Add --apply to resume the listed agents.")
 
 
 def main(argv=None):
@@ -448,13 +482,20 @@ def main(argv=None):
             role_cmd(ns)
         elif ns.command == "team":
             team_cmd(ns)
+        elif ns.command == "resume":
+            resume_cmd(ns)
+        elif ns.command == "pm":
+            print(json.dumps(register_pm(rootpath(ns.path), ns.provider, ns.model, ns.effort), indent=2))
         elif ns.command == "doctor":
             doctor(ns)
         elif ns.command == "install":
             install_skills(ns)
         elif ns.command == "_launch":
             os.environ["AGENTORG_HOME"] = str(rootpath(ns.profile_store))
-            sys.exit(launch_agent_process(rootpath(ns.project), ns.role, ns.pm))
+            sys.exit(launch_agent_process(rootpath(ns.project), ns.role, ns.pm, ns.session_id, ns.resume))
+        elif ns.command == "_resume_pm":
+            os.environ["AGENTORG_HOME"] = str(rootpath(ns.profile_store))
+            sys.exit(resume_pm_process(rootpath(ns.project)))
     except OrgError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(2)
