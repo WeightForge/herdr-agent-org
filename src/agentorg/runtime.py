@@ -445,14 +445,18 @@ def pending_owner_decisions(project: Path) -> list[str]:
     return [i for i in ids if re.search(r"-(requires_owner_decision|safety_or_cost_risk)(-[0-9a-f]{4})?$", i) and i not in handled]
 
 
-def _working(record) -> bool:
+def _status(record):
     record = record.get("terminal", record) if isinstance(record, dict) else {}
     status = record.get("status")
-    return (status.get("state") if isinstance(status, dict) else status) == "working"
+    return status.get("state") if isinstance(status, dict) else status
+
+
+def _working(record) -> bool:
+    return _status(record) == "working"
 
 
 def watch_once(project: Path, stale_minutes: float = STALE_MINUTES, now: float | None = None) -> dict:
-    """One watchdog check: wake the PM (hc send --if idle) when open tasks are stale or nobody is working."""
+    """One watchdog check: wake an idle or done PM (hc send) when open tasks are stale or nobody is working."""
     now = time.time() if now is None else now
     doc = load_project(project)
     open_tasks = [t for t in task_states(project, stale_minutes, now) if t["state"] not in ("done", "cancelled", "blocked")]
@@ -478,8 +482,15 @@ def watch_once(project: Path, stale_minutes: float = STALE_MINUTES, now: float |
         return {"action": "none", "reason": "PM woken recently", "stale": stale}
     msg = ("WATCHDOG: open tasks are stale or all roles are idle. Run agentorg team status, check QUESTION.md for owner answers, "
            "then reassign, unblock or unpark the tasks.")
-    sent = run_process(["hc", "send", "--if", "idle", pm, msg], timeout=30)
-    if sent.returncode != 0:  # e.g. the PM is working or blocked: try again next check
+    try:
+        pm_status = _status(existing_terminal(pm))
+    except OrgError:
+        pm_status = None
+    if pm_status in ("working", "blocked"):  # never type into a busy turn or a prompt; try again next check
+        return {"action": "send_skipped", "reason": f"PM is {pm_status}", "stale": stale}
+    # Not `hc send --if idle`: an agent that finished its turn reports `done`, not `idle` (live hc 0.1.22).
+    sent = run_process(["hc", "send", pm, msg], timeout=30)
+    if sent.returncode != 0:
         return {"action": "send_skipped", "reason": (sent.stderr or sent.stdout).strip()[:200], "stale": stale}
     runtime["watch_woke_at"] = now
     write_json(runtime_file, runtime)

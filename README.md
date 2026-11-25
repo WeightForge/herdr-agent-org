@@ -243,7 +243,7 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 | `agentorg team up [--apply]` | Start or reuse terminals and create worktrees (only with `--apply`) |
 | `agentorg team send ROLE MESSAGE [--wait]` | `hc send` to a live role; use it for packet paths |
 | `agentorg team status` | Per-task state, inbox count, blocked terminals, owner decisions, live roles |
-| `agentorg team watch [--loop] [--interval N] [--stale-minutes M]` | One watchdog check (or a loop): `hc send --if idle` a wake-up to the PM when open tasks are stale or no role is working |
+| `agentorg team watch [--loop] [--interval N] [--stale-minutes M]` | One watchdog check (or a loop): `hc send` a wake-up to the PM (only when it is idle or done) when open tasks are stale or no role is working |
 | `agentorg team reconcile` | Same as `status`, and refresh the untracked `.ai/RUNTIME.json` |
 | `agentorg team down [--apply] [--remove-worktrees]` | Dry run by default; stops only terminals whose labels match this project, workers first; worktree removal never uses `--force`, branches are kept |
 | `agentorg team smoke [--keep]` | Live check against a running Herdr core using fake agents; zero model tokens |

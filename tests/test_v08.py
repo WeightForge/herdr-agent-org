@@ -134,12 +134,12 @@ class WatchTest(Fixture):
         self.init()
         self.task("t1", "started")
         later = time.time() + 3600
-        result, sent = self.watch({"status": "working"}, now=later)
+        result, sent = self.watch({"status": "done"}, now=later)  # a PM that finished its turn is `done`, not `idle`
         self.assertEqual(result["action"], "woke_pm")
         self.assertEqual(result["stale"], ["t1"])
-        self.assertEqual(sent[0][:5], ["hc", "send", "--if", "idle", "t7"])
-        self.assertIn("agentorg team status", sent[0][5])
-        again, sent2 = self.watch({"status": "working"}, now=later + 60)
+        self.assertEqual(sent[0][:3], ["hc", "send", "t7"])
+        self.assertIn("agentorg team status", sent[0][3])
+        again, sent2 = self.watch({"status": "done"}, now=later + 60)
         self.assertEqual((again["action"], again["reason"], sent2), ("none", "PM woken recently", []))
 
     def test_all_idle_wakes_but_fresh_or_working_does_not(self):
@@ -158,6 +158,9 @@ class WatchTest(Fixture):
         later = time.time() + 3600
         result, _ = self.watch(None, now=later, sent_rc=1)
         self.assertEqual((result["action"], result["reason"]), ("send_skipped", "not idle"))
+        for busy in ("working", "blocked"):  # never typed into a busy PM or a prompt
+            result, sent = self.watch({"status": {"state": busy}}, now=later)
+            self.assertEqual((result["action"], result["reason"], sent), ("send_skipped", f"PM is {busy}", []))
         with patch("agentorg.runtime.existing_terminal", return_value=None):
             with patch("agentorg.runtime.pm_terminal", return_value=None):
                 self.assertEqual(runtime.watch_once(self.project, now=later)["reason"], "no PM terminal known")
