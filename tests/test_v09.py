@@ -264,3 +264,13 @@ class CliTest(Fixture):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExistingTerminalTest(unittest.TestCase):
+    def test_pm_found_by_address_even_when_named(self):
+        rec = {"address": "t8", "name": "pm-pane", "state": "live"}
+        out = subprocess.CompletedProcess([], 0, stdout=json.dumps(rec), stderr="")
+        with patch("agentorg.runtime.run_process", return_value=out):
+            self.assertEqual(runtime.existing_terminal("t8")["name"], "pm-pane")
+            with self.assertRaises(runtime.OrgError):
+                runtime.existing_terminal("other-name")

@@ -129,7 +129,7 @@ def existing_terminal(name: str, expected_labels: dict | None = None):
     if record.get("state") == "finished" or record.get("live") is False:
         return None
     reported = record.get("name")
-    if isinstance(reported, str) and reported != name:
+    if isinstance(reported, str) and reported != name and record.get("address") != name:  # the PM is looked up by address
         raise OrgError(f"hc get {name} returned another terminal: {reported}")
     if expected_labels is not None:
         labels = record.get("labels")
