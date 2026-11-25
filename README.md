@@ -256,7 +256,7 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 | `agentorg team status` | Per-task state, inbox count, blocked terminals, owner decisions, live roles |
 | `agentorg team watch [--loop] [--interval N] [--stale-minutes M]` | One watchdog check (or a loop): `hc send` a wake-up to the PM (only when it is idle or done) when open tasks are stale or no role is working |
 | `agentorg resume [--all] [--apply]` | After a restart: reopen each agent in its original pane and conversation (dry run without `--apply`) |
-| `agentorg pm register` | Run by the PM: record its own provider session and terminal for `resume` |
+| `agentorg pm register [--model M] [--effort E]` | Run by the PM: record its own provider session, terminal, model and effort for `resume` |
 | `agentorg team reconcile` | Same as `status`, and refresh the untracked `.ai/RUNTIME.json` |
 | `agentorg team down [--apply] [--remove-worktrees]` | Dry run by default; stops only terminals whose labels match this project, workers first; worktree removal never uses `--force`, branches are kept |
 | `agentorg team smoke [--keep]` | Live check against a running Herdr core using fake agents; zero model tokens |

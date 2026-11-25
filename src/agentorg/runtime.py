@@ -743,7 +743,7 @@ def discover_sessions(runtime: dict) -> bool:
     return changed
 
 
-def register_pm(project: Path, provider: str | None = None) -> dict:
+def register_pm(project: Path, provider: str | None = None, model: str | None = None, effort: str | None = None) -> dict:
     """Record the calling PM's own provider session in RUNTIME.json (run by the PM, inside its session)."""
     env = os.environ
     if not provider:
@@ -759,7 +759,11 @@ def register_pm(project: Path, provider: str | None = None) -> dict:
         sid = find_session(provider, project, config_dir, 0, _claimed(runtime), newest=True)
     if not sid:
         raise OrgError("Could not find the PM's session id; resume will not be able to reopen the PM conversation.")
-    runtime["pm"] = {"provider": provider, "session_id": sid, "cwd": str(project), "config_dir": config_dir, "terminal": pm_terminal()}
+    for value in (model, effort):
+        if value is not None and not SESSION_RE.fullmatch(value):
+            raise OrgError("model and effort may only contain letters, digits, '.', '_' and '-'")
+    runtime["pm"] = {"provider": provider, "session_id": sid, "cwd": str(project), "config_dir": config_dir, "terminal": pm_terminal(),
+                     "model": model, "effort": effort}
     if pm_terminal():
         runtime["pm_terminal"] = pm_terminal()
     write_json(runtime_file, runtime)
@@ -772,6 +776,10 @@ def resume_pm_process(project: Path):
     if provider not in PROVIDER_COMMAND or not SESSION_RE.fullmatch(pm.get("session_id") or ""):
         raise OrgError("No registered PM session; run agentorg pm register inside the PM first.")
     flags = ["--no-daemon"] if provider == "codex" else []
+    if pm.get("model"):
+        flags += ["-m" if provider == "codex" else "--model", pm["model"]]
+    if pm.get("effort"):
+        flags += ["-c", f"model_reasoning_effort={pm['effort']}"] if provider == "codex" else ["--effort", pm["effort"]]
     cmd = _resume_cmd(provider, PROVIDER_COMMAND[provider], flags, pm["session_id"], PM_WAKE)
     return _run_provider(cmd, _provider_env(provider, pm.get("config_dir")))
 

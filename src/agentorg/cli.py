@@ -110,6 +110,8 @@ def add_parser() -> argparse.ArgumentParser:
     q.add_argument("op", choices=("register",))
     q.add_argument("--path", default=".")
     q.add_argument("--provider", choices=("claude", "codex", "antigravity"), help="Only when it cannot be detected from the environment")
+    q.add_argument("--model", help="Your own model, so resume reopens you on it (else the provider default)")
+    q.add_argument("--effort", help="Your own reasoning effort, for the same reason")
 
     q = sub.add_parser("doctor", help="Check local availability (no provider API calls)")
     q.add_argument("--path", default=".")
@@ -483,7 +485,7 @@ def main(argv=None):
         elif ns.command == "resume":
             resume_cmd(ns)
         elif ns.command == "pm":
-            print(json.dumps(register_pm(rootpath(ns.path), ns.provider), indent=2))
+            print(json.dumps(register_pm(rootpath(ns.path), ns.provider, ns.model, ns.effort), indent=2))
         elif ns.command == "doctor":
             doctor(ns)
         elif ns.command == "install":

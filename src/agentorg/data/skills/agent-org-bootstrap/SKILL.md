@@ -50,7 +50,7 @@ The owner's "yes" is the launch approval for this setup only. It is not permissi
 3. Write `.ai/PROJECT.md` and `.ai/ROADMAP.md` from project evidence; template placeholders are not requirements.
 4. `agentorg doctor`, then `agentorg team plan`. Fix any reported issue before continuing.
 5. Commit only `.ai/TEAM.json`, `.ai/PROTOCOL.md`, `.ai/PROJECT.md`, `.ai/ROADMAP.md`, `.ai/STATE.md`, `.ai/DECISIONS.md`, `.ai/.gitignore` and `QUESTION.md` (worktrees branch from `HEAD`).
-6. `agentorg team up --apply`, then `agentorg pm register` (records your own provider session, so `agentorg resume` can reopen you after a restart).
+6. `agentorg team up --apply`, then `agentorg pm register [--model <your model id>] [--effort <your effort>]` (records your own provider session, so `agentorg resume` can reopen you after a restart; pass your model and effort if you know them, otherwise you come back on the provider default).
 7. Report the panes and terminals that started and hand over to `agent-org-manager`. On PM restart use `agent-org-recovery` rather than rebuilding from scratch.
 
 ## Unattended operation

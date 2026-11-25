@@ -221,6 +221,17 @@ class SessionDiscoveryTest(Fixture):
         self.assertEqual(rt["pm"]["config_dir"], str(self.root))
         self.assertEqual(out["provider"], "claude")
 
+    def test_pm_resumes_on_its_registered_model(self):
+        # live: a PM registered without a model came back on the provider default model
+        self.init()
+        with patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": UUID, "HC_TERMINAL_ID": "t5"}):
+            runtime.register_pm(self.project, model="opus", effort="high")
+            with self.assertRaises(config.OrgError):
+                runtime.register_pm(self.project, model="bad model;")
+        with patch("agentorg.runtime._run_provider", side_effect=lambda cmd, env: cmd):
+            cmd = runtime.resume_pm_process(self.project)
+        self.assertEqual(cmd[1:7], ["--model", "opus", "--effort", "high", "--resume", UUID])
+
     def test_register_pm_without_provider_hint_fails(self):
         self.init()
         with patch.dict(os.environ, {}, clear=True), self.assertRaisesRegex(config.OrgError, "--provider"):
