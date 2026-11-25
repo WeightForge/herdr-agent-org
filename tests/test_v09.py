@@ -240,8 +240,13 @@ class ShellLineTest(unittest.TestCase):
         self.assertEqual(runtime.shell_kind(shell("/bin/bash")), "bash")
         self.assertIsNone(runtime.shell_kind({"argv": ["agy"], "foreground": {"name": "bash", "argv": ["bash"]}}))  # agent running a tool
         self.assertIsNone(runtime.shell_kind({"argv": None}))
-        self.assertIsNone(runtime.pm_shell_kind({"argv": ["pwsh"], "status": {"state": "done"}}))
-        self.assertEqual(runtime.pm_shell_kind({"argv": ["pwsh"], "status": None}), "pwsh")
+        self.assertIsNone(runtime.lost_shell_kind({"argv": ["pwsh"], "status": {"state": "done"}}))  # PM pane with an agent
+        self.assertEqual(runtime.lost_shell_kind({"argv": ["pwsh"], "status": None}), "pwsh")
+        # after a resume the agent runs inside the replacement shell (live): still running, never resumed twice
+        resumed = {"argv": ["/bin/bash"], "status": {"state": "idle"}, "foreground": {"name": "agy", "argv": ["agy"]}}
+        self.assertIsNone(runtime.lost_shell_kind(resumed))
+        self.assertIsNone(runtime.lost_shell_kind({**resumed, "status": None}))  # agent starting, not yet detected
+        self.assertEqual(runtime.lost_shell_kind({**resumed, "status": None, "foreground": {"name": "bash"}}), "bash")
         self.assertIsNone(runtime.shell_kind({}))
 
 

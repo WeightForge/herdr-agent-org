@@ -790,10 +790,18 @@ def shell_kind(record) -> str | None:
     return stem if stem in SHELLS else None
 
 
-def pm_shell_kind(record) -> str | None:
-    """A PM pane started in Herdr App always has a shell as its program, so the PM is gone only when hc also sees no agent."""
+def lost_shell_kind(record) -> str | None:
+    """Shell kind when the terminal holds only a shell and no agent, else None.
+
+    A shell as the terminal's program is not enough: the owner's PM pane always has one, and after a resume the agent runs
+    inside the replacement shell (live hc 0.1.22). So hc must also report no agent status, and nothing but a shell in front.
+    """
     kind = shell_kind(record)
-    return kind if kind and _status(record) is None else None
+    if not kind or _status(record) is not None:
+        return None
+    record = record.get("terminal", record)
+    fg = record.get("foreground")
+    return kind if not isinstance(fg, dict) or shell_kind({"argv": [fg.get("name") or (fg.get("argv") or [""])[0]]}) else None
 
 
 def shell_line(kind: str, argv: list) -> str:
@@ -828,7 +836,7 @@ def resume_team(project: Path, *, apply: bool = False, panes: bool = True) -> li
         except OrgError as exc:
             item.update(action="skipped", reason=str(exc))
             continue
-        if active is not None and not shell_kind(active):
+        if active is not None and not lost_shell_kind(active):
             item["action"] = "running"
             continue
         if session is None:
@@ -837,7 +845,7 @@ def resume_team(project: Path, *, apply: bool = False, panes: bool = True) -> li
         if active is None:
             item.update(action="recreate", command=role_launch_cmd(project, role, cwd, resume=session))
         else:
-            line = shell_line(shell_kind(active), _entry_argv(project, "_launch", "--role", rid, "--resume", session))
+            line = shell_line(lost_shell_kind(active), _entry_argv(project, "_launch", "--role", rid, "--resume", session))
             item.update(action="resume_in_shell", command=line)
         if apply:
             sent = (run_process(item["command"], cwd=project, timeout=45) if active is None
@@ -864,7 +872,7 @@ def _resume_pm(project: Path, runtime: dict, team_changed: bool, apply: bool) ->
         return {**item, "action": "skipped", "reason": str(exc)}
     if active is None:
         return {**item, "action": "pm_terminal_gone", "reason": "reopen the PM in Herdr App, then run agentorg pm register"}
-    kind = pm_shell_kind(active)
+    kind = lost_shell_kind(active)
     if kind and not rec.get("session_id"):
         return {**item, "action": "no_session", "reason": "PM session was never registered; reopen it by hand, then run agentorg pm register"}
     if kind:
