@@ -20,7 +20,7 @@ class ProtocolCopyTest(Fixture):
     def test_init_copies_and_is_idempotent(self):
         self.init()
         self.assertEqual(self.dest().read_text(encoding="utf-8"), PACKAGED.read_text(encoding="utf-8"))
-        self.assertTrue(PACKAGED.read_text(encoding="utf-8").startswith("# Agent organization protocol\n\nProtocol version: 1\n"))
+        self.assertTrue(PACKAGED.read_text(encoding="utf-8").startswith("# Agent organization protocol\n\nProtocol version: 2\n"))
         before = self.dest().stat().st_mtime_ns
         self.assertEqual(runtime.install_protocol(self.project), "unchanged")
         self.assertEqual(self.dest().stat().st_mtime_ns, before)
@@ -29,7 +29,7 @@ class ProtocolCopyTest(Fixture):
         self.init()
         self.dest().write_text("# old\n\nProtocol version: 0\n", encoding="utf-8")
         self.assertEqual(runtime.install_protocol(self.project), "updated")
-        self.assertIn("Protocol version: 1", self.dest().read_text(encoding="utf-8"))
+        self.assertIn("Protocol version: 2", self.dest().read_text(encoding="utf-8"))
 
     def test_same_version_text_change_is_refreshed(self):
         self.init()

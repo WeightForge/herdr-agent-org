@@ -22,9 +22,11 @@ class TempOrgTest(unittest.TestCase):
         self._home.start()
         self.addCleanup(self._home.stop)
 
-    def init(self, template="engineering"):
+    def init(self, template="engineering", autonomy="supervised"):
         with contextlib.redirect_stdout(io.StringIO()):
             cli.main(["init", "--path", str(self.project), "--name", "demo", "--template", template])
+        f = self.project / ".ai" / "TEAM.json"  # most tests cover the pre-0.8 supervised behavior
+        f.write_text(f.read_text(encoding="utf-8").replace('"autonomy": "full"', f'"autonomy": "{autonomy}"'), encoding="utf-8", newline=chr(10))
 
     def make_profiles(self):
         for alias, provider in (("reviewer", "claude"), ("implementer", "claude"), ("designer", "claude"), ("frontend", "codex")):

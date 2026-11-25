@@ -33,7 +33,7 @@ Reviewers write each escalation to `.ai/inbox/<UTC>-<task>-<code>-<hex4>.md` (gi
 
 ## Protocol and task lifecycle
 
-`src/agentorg/data/PROTOCOL.md` (versioned, `Protocol version: 1`) is the single source of the file layout, task states, escalation codes and safety rules. `agentorg init` and `team up --apply` copy it to `.ai/PROTOCOL.md` (never overwritten unless the project copy is an older protocol version; a differing copy that is not older is kept with a warning). Launch prompts give each role the absolute path and keep only a short role summary; skills add role guidance only.
+`src/agentorg/data/PROTOCOL.md` (versioned, `Protocol version: 2`) is the single source of the file layout, task states, escalation codes and safety rules. `agentorg init` and `team up --apply` copy it to `.ai/PROTOCOL.md` (never overwritten unless the project copy is an older protocol version; a differing copy that is not older is kept with a warning). Launch prompts give each role the absolute path and keep only a short role summary; skills add role guidance only.
 
 Task state is derived from files, with no database: `dispatched` -> `acknowledged` (reviewer wrote `progress.md`) -> `started` (reviewer records the worker's `ACK <task>`) -> `in_review` -> `done` / `blocked`, plus `cancelled` (PM `cancel` marker) and `reassigned` (PM `reassign.md`). `team status` prints `tasks` (id, state, next actor, flags such as `unknown_delivery`) and `owner_decisions`. Workers never write into the root checkout, so the worker ack is a message that the reviewer records.
 

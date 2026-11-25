@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import sys
+import time
 from pathlib import Path
 
 from . import __version__
@@ -14,7 +15,7 @@ from .config import (OrgError, load_profiles, save_profiles, profiles_path, vali
                      load_project, validate_project, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
 from .runtime import (blocked_info, redact_record, start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
                       existing_terminal, run_process, validate_binaries, which, stop_team, inbox_pending,
-                      install_protocol, task_states, pending_owner_decisions)
+                      install_protocol, task_states, pending_owner_decisions, watch_once, STALE_MINUTES)
 
 
 def add_parser() -> argparse.ArgumentParser:
@@ -77,13 +78,18 @@ def add_parser() -> argparse.ArgumentParser:
 
     q = sub.add_parser("team", help="Plan, launch and monitor Herdr team")
     ts = q.add_subparsers(dest="op", required=True)
-    for op in ("plan", "up", "status", "reconcile", "down"):
+    for op in ("plan", "up", "status", "reconcile", "down", "watch"):
         a = ts.add_parser(op)
         a.add_argument("--path", default=".")
         if op == "up":
             a.add_argument("--no-panes", action="store_true", help="Do not show roles as panes in the current Herdr App tab")
         if op in ("up", "down"):
             a.add_argument("--apply", action="store_true", help="Required to actually create/stop worktrees and agents")
+        if op in ("status", "reconcile", "watch"):
+            a.add_argument("--stale-minutes", type=float, default=STALE_MINUTES, help="Minutes without task activity before a task is stale")
+        if op == "watch":
+            a.add_argument("--loop", action="store_true", help="Keep checking until interrupted")
+            a.add_argument("--interval", type=int, default=60, help="Seconds between checks with --loop")
         if op == "down":
             a.add_argument("--remove-worktrees", action="store_true", help="git worktree remove (no --force) for stopped workers; branches are kept")
     a = ts.add_parser("smoke", help="Live end-to-end check with fake agents (no model tokens)")
@@ -392,6 +398,12 @@ def team_cmd(ns):
         if not ns.apply:
             print("Nothing stopped. Add --apply to stop the listed terminals.")
         return
+    if ns.op == "watch":
+        while True:
+            print(json.dumps(watch_once(root, ns.stale_minutes)), flush=True)
+            if not ns.loop:
+                return
+            time.sleep(max(ns.interval, 5))
     if ns.op == "send":
         role = resolve_role(doc, ns.role)
         name = terminal_name(root, role["id"])
@@ -422,7 +434,7 @@ def team_cmd(ns):
             runtime.setdefault("terminals", {}).setdefault(s["role"], {}).update({"name": s["terminal"], "live": s["live"]})
         write_json(root / ".ai" / "RUNTIME.json", runtime)
     print(json.dumps({"project": doc["project_id"], "inbox_pending": inbox_pending(root), "blocked": blocked,
-                      "owner_decisions": pending_owner_decisions(root), "tasks": task_states(root), "status": status}, indent=2))
+                      "owner_decisions": pending_owner_decisions(root), "tasks": task_states(root, getattr(ns, "stale_minutes", STALE_MINUTES)), "status": status}, indent=2))
 
 
 def main(argv=None):

@@ -7,8 +7,8 @@ description: Set up an AI team for an existing project with one question: detect
 
 ## Running the CLI
 
-Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.7.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.7.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.7.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
-<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.7.0`. tests/test_plugins.py checks the pin against __version__. -->
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.8.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.8.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.8.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.8.0`. tests/test_plugins.py checks the pin against __version__. -->
 
 ## One-question flow
 
@@ -26,7 +26,7 @@ Goal: the owner asks once, answers exactly one question, and the team is running
 - Give every role a domain-specific `title` and `focus` taken from what the project is. Pair each worker with a reviewer (`--reviewer-role`).
 - Team size is the owner's decision. If the owner named a size or roles, propose exactly that, however large. There is no limit on reviewers or workers.
 - If the owner did not say, size the team from the project: a small or single-area project starts with one reviewer and one worker; a project with clearly separate areas (for example ML, frontend, infrastructure) gets one reviewer per area. One reviewer may lead several workers when the work is one area that splits into parallel tasks. Every extra agent costs quota and a first-launch trust prompt, so do not add roles the evidence does not support.
-- Assign accounts from the detected profiles. Your own (PM) account is the directory in `CLAUDE_CONFIG_DIR` (Claude Code) or `CODEX_HOME` (Codex), or the default `~/.claude` / `~/.codex` when unset. Prefer accounts other than the PM's when possible, and put workers on the account with the most headroom if the owner said which. Do not invent model names: leave model and effort unset (CLI default) unless the owner specified them.
+- Assign accounts from the detected profiles. Your own (PM) account is the directory in `CLAUDE_CONFIG_DIR` (Claude Code) or `CODEX_HOME` (Codex), or the default `~/.claude` / `~/.codex` when unset. Prefer accounts other than the PM's when possible, and put workers on the account with the most headroom if the owner said which. Pick a model and effort per role from what that account's provider offers: read `agentorg profile list` and the provider CLI's help (`claude --help`, `codex --help`, `agy --help`) for the available models and effort levels, and never invent a model id. Give reviewers and hard research roles a stronger model with higher effort, and routine workers a cheaper, faster model with lower effort. If you cannot verify a model id, leave it unset (CLI default). Respect any model or effort the owner named.
 - Choose the role ids (lowercase, `-`), for example `ai-scientist`, `ai-engineer`.
 
 ### 3. Send ONE message
@@ -34,9 +34,10 @@ Goal: the owner asks once, answers exactly one question, and the team is running
 Contents, in this order:
 
 1. Detected accounts (alias, provider, whether the command was found).
-2. The proposed team as a table: `Title | Level | Account | Focus`.
+2. The proposed team as a table: `Title | Level | Account | Model | Effort | Focus`.
 3. Two or three lines on what `.ai/PROJECT.md` and `.ai/ROADMAP.md` will say.
-4. The single question: **Start this team, or tell me what to change?**
+4. Settings the owner can change in the same reply: autonomy (default `full`: agents run without permission prompts and park owner decisions in `QUESTION.md`; or `supervised`) and the approval flags for merge, release and deploy (default: the owner approves each, as in `human_approval`).
+5. The single question: **Start this team, or tell me what to change?**
 
 Ask nothing else, and never ask for tokens, emails or passwords. If the owner asks for changes, update the proposal and ask the same single question again.
 
@@ -45,7 +46,7 @@ Ask nothing else, and never ask for tokens, emails or passwords. If the owner as
 The owner's "yes" is the launch approval for this setup only. It is not permission to merge, release, deploy or spend.
 
 1. `agentorg profile detect --add` registers the detected accounts that are not registered yet (it skips an alias already used by a different profile; report that).
-2. Shape the team: for each proposed role `agentorg role add <id> --mode reviewer|worker --title "..." --focus "..." --profile <alias> [--reviewer-role <id>] [--model ...] [--effort ...]`. Add the new roles first, then remove template roles that are not part of the team with `agentorg role remove <id>` (a team always keeps at least one role; remove the worker before its reviewer), or adapt one with `agentorg role set <id> --title ... --focus ... --profile ...`. Titles and focus must not contain `" % & | < > ^`.
+2. Shape the team: for each proposed role `agentorg role add <id> --mode reviewer|worker --title "..." --focus "..." --profile <alias> [--reviewer-role <id>] [--model <id>] [--effort <level>]` using the table's model and effort. Then set `autonomy` and any changed `human_approval` flags in `.ai/TEAM.json` to the owner's choice (edit the file by hand; keep valid JSON). Add the new roles first, then remove template roles that are not part of the team with `agentorg role remove <id>` (a team always keeps at least one role; remove the worker before its reviewer), or adapt one with `agentorg role set <id> --title ... --focus ... --profile ...`. Titles and focus must not contain `" % & | < > ^`.
 3. Write `.ai/PROJECT.md` and `.ai/ROADMAP.md` from project evidence; template placeholders are not requirements.
 4. `agentorg doctor`, then `agentorg team plan`. Fix any reported issue before continuing.
 5. Commit only `.ai/TEAM.json`, `.ai/PROTOCOL.md`, `.ai/PROJECT.md`, `.ai/ROADMAP.md`, `.ai/STATE.md`, `.ai/DECISIONS.md`, `.ai/.gitignore` and `QUESTION.md` (worktrees branch from `HEAD`).
@@ -54,7 +55,7 @@ The owner's "yes" is the launch approval for this setup only. It is not permissi
 
 ## Unattended operation
 
-Agents message each other with `hc`, and every provider asks the human before running a command it has not been allowed to run. Pre-allow only the `hc` commands agents use, in each provider's own settings; do not use dangerous skip-permission flags. Claude Code example (`settings.json`), exact targets where the version supports mid-pattern wildcards (terminal names are `ao-<project>-<role>-<hash>`): `"permissions": {"allow": ["Bash(hc send ao-myproj-*)", "Bash(hc read:*)", "Bash(hc get:*)", "Bash(hc ls:*)"]}`. A prefix rule (`:*`) matches any trailing arguments, so it may also allow flags such as `--force`; where a provider cannot express the restriction, keep interactive approval for that command. Folder trust stays a per-worktree human decision (for example Antigravity for `.agentorg-worktrees`). Never allow `hc keys`; agents must not answer each other's prompts.
+With `autonomy: full` (the default for new projects), agentorg launches Claude and Antigravity with `--dangerously-skip-permissions` and Codex with `--dangerously-bypass-approvals-and-sandbox`, so agents do not stop for permission prompts. This is not a sandbox: say so in the proposal, and tell the owner the hard lines (protocol, Autonomy) that agents never cross and park in `QUESTION.md`. With `autonomy: supervised`, no such flag is added and the human approves prompts; pre-allow only the `hc` commands agents use in each provider's own settings, for example Claude Code `"permissions": {"allow": ["Bash(hc send ao-myproj-*)", "Bash(hc read:*)", "Bash(hc get:*)", "Bash(hc ls:*)"]}`; a `:*` prefix rule also matches flags such as `--force`, so where a provider cannot restrict it keep interactive approval. Folder trust for a worktree can still show a first-run prompt: in `full` the PM or a reviewer answers it with `hc keys`; in `supervised` the human does. After the launch the PM starts `agentorg team watch --loop` (see `agent-org-manager`).
 
 Task files: `agentorg init` does not create `.ai/tasks/`; the PM creates `.ai/tasks/<id>/` per task. It is versioned project state: do not add it to `.gitignore` (only `RUNTIME.json` and `inbox/` are ignored).
 

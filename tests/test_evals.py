@@ -100,7 +100,7 @@ class EvalGraderTest(unittest.TestCase):
             proj, doc, subs = run.project_context(Path(tmp))
             for s in run.load_scenarios():
                 prompt = run.build_prompt(s, proj, doc, subs)
-                self.assertIn("Protocol version: 1", prompt, s["name"])
+                self.assertIn("Protocol version: 2", prompt, s["name"])
                 for token in subs:
                     self.assertNotIn(token, prompt, s["name"])
 

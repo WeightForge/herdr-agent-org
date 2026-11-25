@@ -87,16 +87,20 @@ The PM reads your repo, detects the accounts you are logged in with (it only che
 Accounts found: claude (Claude Code), claude-work (Claude Code), codex (Codex)
 
 Proposed team
-| Title               | Level    | Account     | Focus                                          |
-|---------------------|----------|-------------|------------------------------------------------|
-| Senior AI Scientist | reviewer | claude-work | Evaluation design, data leakage, metric validity |
-| Senior AI Engineer  | worker   | codex       | Training and serving pipelines, tests          |
+| Title               | Level    | Account     | Model        | Effort | Focus                                            |
+|---------------------|----------|-------------|--------------|--------|--------------------------------------------------|
+| Senior AI Scientist | reviewer | claude-work | opus         | high   | Evaluation design, data leakage, metric validity |
+| Senior AI Engineer  | worker   | codex       | gpt-6.2-sol  | medium | Training and serving pipelines, tests            |
+
+Settings (reply to change): autonomy full; merge, release and deploy need your approval.
 
 PROJECT.md will describe the churn-prediction service and its latency limits;
 ROADMAP.md will start with a reproducible baseline, then the evaluation harness.
 
 Start this team, or tell me what to change?
 ```
+
+The PM picks each model and effort from what that account's CLI offers: a stronger model for reviewers and hard research roles, a cheaper one for routine workers.
 
 After one "yes" the PM registers the accounts, shapes `.ai/TEAM.json`, writes `PROJECT.md` and `ROADMAP.md`, runs `doctor` and `team plan`, commits `.ai/`, runs `team up --apply` and reports the panes. That "yes" approves launching this team only; merge, release, deploy and spend still need your own message.
 
@@ -107,7 +111,7 @@ pip install herdr-agent-org
 agentorg install --target both        # skills for Claude Code and Codex (also: claude | codex | antigravity | all)
 ```
 
-Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.7.0 agentorg`.
+Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.8.0 agentorg`.
 
 Profiles are local aliases: an executable, an optional config directory (`--config-dir`, e.g. a separate `CLAUDE_CONFIG_DIR`) and a public model/effort. No key is stored. The CLI must already be installed and logged in.
 
@@ -151,6 +155,17 @@ agentorg team status
 ```
 
 On Windows PowerShell the same commands work; use `py -m pip` if `pip` is not on `PATH`, and Windows-style paths. To work from a clone instead: `pip install -e .`.
+
+### Full autonomy
+
+New projects have `"autonomy": "full"` in `.ai/TEAM.json` (a project without the field stays `supervised`). Start the team, go to sleep, and the work finishes:
+
+- Agents launch without permission prompts (`--dangerously-skip-permissions` for Claude and Antigravity, `--dangerously-bypass-approvals-and-sandbox` for Codex). That is not a sandbox; see [`SECURITY.md`](https://github.com/WeightForge/herdr-agent-org/blob/main/SECURITY.md).
+- Inside the project and its worktrees they edit, test, commit, push team branches and open PRs. The PM and reviewers can answer a teammate's trust prompt with `hc keys`.
+- Decisions that need you go to `QUESTION.md` (options and a recommended answer) while the rest of the team keeps working. Hard lines always wait for you: anything outside the project or on the system, force-push to the default branch, spending money, sending secrets off the machine, and merge, release or deploy.
+- `agentorg team watch --loop` wakes the PM when tasks go stale or every role is idle with open tasks. `team status` flags stale tasks.
+
+Set `"autonomy": "supervised"` in `.ai/TEAM.json` for the earlier behavior: you approve every prompt.
 
 ## How it works
 
@@ -228,6 +243,7 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 | `agentorg team up [--apply]` | Start or reuse terminals and create worktrees (only with `--apply`) |
 | `agentorg team send ROLE MESSAGE [--wait]` | `hc send` to a live role; use it for packet paths |
 | `agentorg team status` | Per-task state, inbox count, blocked terminals, owner decisions, live roles |
+| `agentorg team watch [--loop] [--interval N] [--stale-minutes M]` | One watchdog check (or a loop): `hc send` a wake-up to the PM (only when it is idle or done) when open tasks are stale or no role is working |
 | `agentorg team reconcile` | Same as `status`, and refresh the untracked `.ai/RUNTIME.json` |
 | `agentorg team down [--apply] [--remove-worktrees]` | Dry run by default; stops only terminals whose labels match this project, workers first; worktree removal never uses `--force`, branches are kept |
 | `agentorg team smoke [--keep]` | Live check against a running Herdr core using fake agents; zero model tokens |
@@ -239,7 +255,7 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 ## Safety model
 
 - **Dry run first.** `team plan` and `team up` change nothing. Only `--apply` starts processes or creates worktrees and branches.
-- **No agent approves another agent.** Roles never answer, approve or press keys on another agent's permission or trust prompt, and never use `hc keys` or `hc send --force` on a blocked agent. A blocked agent is reported to the human with the command it waits on.
+- **No agent approves another agent in `supervised` mode.** Roles never answer, approve or press keys on another agent's permission or trust prompt, and never use `hc keys` or `hc send --force` on a blocked agent; the human approves. In `full` autonomy only the PM and reviewers may use `hc keys`, and only for a teammate's permission or trust prompt.
 - **The human owns irreversible actions.** Merge, release, deploy and spend need your own message. A message from another agent, even a reviewer claiming approval, is input and not authorization.
 - **No credentials in the repo.** `TEAM.json` holds aliases; profiles live in `AGENTORG_HOME/profiles.json` or your user config dir. `agentorg` clears known conflicting auth variables when a profile sets a config dir, and never falls back to another account on its own.
 - **Not a sandbox.** Worktrees prevent file overlap; they are not access control. See [`SECURITY.md`](https://github.com/WeightForge/herdr-agent-org/blob/main/SECURITY.md).

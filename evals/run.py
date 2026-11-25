@@ -59,6 +59,7 @@ def project_context(tmp: Path):
     (proj / ".ai").mkdir(parents=True)
     doc = config.template_document("engineering")
     doc["project_id"] = "demo"
+    doc["autonomy"] = "supervised"  # the scenarios grade the supervised no-hc-keys rules
     config.write_json(config.project_file(proj), doc)
     subs = {"@PM@": "t1", "@REVIEWER@": runtime.terminal_name(proj, "technical-reviewer"),
             "@WORKER@": runtime.terminal_name(proj, "backend-worker")}
