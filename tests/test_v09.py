@@ -16,7 +16,8 @@ UUID = "11111111-2222-4333-8444-555555555555"
 
 
 def shell(name="powershell.exe"):
-    return {"name": "x", "state": "live", "foreground": {"name": name, "argv": [name]}}
+    """A kept terminal whose program was lost: hc replaced it with a shell (argv) and sees no agent (status null)."""
+    return {"name": "x", "state": "live", "argv": [name], "status": None, "foreground": {"name": name, "argv": [name]}}
 
 
 class ResumeTest(Fixture):
@@ -68,7 +69,9 @@ class ResumeTest(Fixture):
         panes.assert_not_called()
 
     def test_running_agent_is_left_alone(self):
-        running = {"name": "x", "state": "live", "foreground": {"name": "python.exe", "argv": ["python.exe"]}}
+        # an agent running a tool: the foreground is a shell, the terminal's own program is not
+        running = {"name": "x", "state": "live", "argv": ["python.exe", "-m", "agentorg", "_launch"], "status": {"state": "working"},
+                   "foreground": {"name": "powershell.exe", "argv": ["powershell.exe"]}}
         items, _ = self.run_resume({n: running for n in self.names()})
         self.assertEqual({i["action"] for i in items if i["role"] != "pm"}, {"running"})
         self.assertEqual(self.sent, [])
@@ -109,7 +112,9 @@ class ResumeTest(Fixture):
         self.assertIn("_resume_pm", pm_send[0][3])
         self.assertEqual(items[-1]["action"], "resume_in_shell")
         self.sent.clear()
-        terminals["t9"] = {"name": "t9", "state": "live", "status": {"state": "idle"}, "foreground": {"name": "node", "argv": ["node"]}}
+        # the owner's PM pane: its program is always a shell; hc sees an agent there, so it is running
+        terminals["t9"] = {"name": "t9", "state": "live", "argv": ["powershell.exe", "-NoExit"], "status": {"state": "idle"},
+                           "foreground": {"name": "powershell.exe", "argv": ["powershell.exe"]}}
         items, _ = self.run_resume(terminals, runtime_extra=extra)
         self.assertEqual(items[-1]["action"], "wake_pm")
         self.assertEqual([s for s in self.sent if s[:3] == ["hc", "send", "t9"]][0][3], runtime.PM_WAKE)
@@ -233,8 +238,10 @@ class ShellLineTest(unittest.TestCase):
     def test_shell_kind(self):
         self.assertEqual(runtime.shell_kind({"terminal": shell("C:\\Windows\\powershell.exe")}), "powershell")
         self.assertEqual(runtime.shell_kind(shell("/bin/bash")), "bash")
-        self.assertIsNone(runtime.shell_kind({"foreground": {"name": "node", "argv": ["node"]}}))
-        self.assertIsNone(runtime.shell_kind({"foreground": None}))
+        self.assertIsNone(runtime.shell_kind({"argv": ["agy"], "foreground": {"name": "bash", "argv": ["bash"]}}))  # agent running a tool
+        self.assertIsNone(runtime.shell_kind({"argv": None}))
+        self.assertIsNone(runtime.pm_shell_kind({"argv": ["pwsh"], "status": {"state": "done"}}))
+        self.assertEqual(runtime.pm_shell_kind({"argv": ["pwsh"], "status": None}), "pwsh")
         self.assertIsNone(runtime.shell_kind({}))
 
 

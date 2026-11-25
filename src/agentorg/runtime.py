@@ -777,14 +777,23 @@ def resume_pm_process(project: Path):
 
 
 def shell_kind(record) -> str | None:
-    """Shell now in the foreground of a terminal (hc get .foreground.name), else None."""
+    """The shell that is the terminal's own program (hc get .argv[0]), else None.
+
+    Live hc 0.1.22 (Linux): when a kept program is lost, argv becomes the replacement shell (["/bin/bash"]) and pid changes.
+    Not .foreground: it shows a shell while a running agent executes a tool, which would type into a live agent.
+    """
     record = record.get("terminal", record) if isinstance(record, dict) else {}
-    fg = record.get("foreground")
-    if not isinstance(fg, dict):
+    argv = record.get("argv")
+    if not isinstance(argv, list) or not argv or not isinstance(argv[0], str):
         return None
-    name = fg.get("name") or (fg.get("argv") or [""])[0]
-    stem = re.split(r"[\\/]", name)[-1].lower().removesuffix(".exe")
+    stem = re.split(r"[\\/]", argv[0])[-1].lower().removesuffix(".exe")
     return stem if stem in SHELLS else None
+
+
+def pm_shell_kind(record) -> str | None:
+    """A PM pane started in Herdr App always has a shell as its program, so the PM is gone only when hc also sees no agent."""
+    kind = shell_kind(record)
+    return kind if kind and _status(record) is None else None
 
 
 def shell_line(kind: str, argv: list) -> str:
@@ -855,7 +864,7 @@ def _resume_pm(project: Path, runtime: dict, team_changed: bool, apply: bool) ->
         return {**item, "action": "skipped", "reason": str(exc)}
     if active is None:
         return {**item, "action": "pm_terminal_gone", "reason": "reopen the PM in Herdr App, then run agentorg pm register"}
-    kind = shell_kind(active)
+    kind = pm_shell_kind(active)
     if kind and not rec.get("session_id"):
         return {**item, "action": "no_session", "reason": "PM session was never registered; reopen it by hand, then run agentorg pm register"}
     if kind:
