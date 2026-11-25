@@ -1,3 +1,11 @@
+## 0.8.0 - full autonomy
+- `autonomy` in `.ai/TEAM.json`: `full` (default in the templates and the example) or `supervised`; a project without the field is `supervised`, so existing teams keep their behavior.
+- With `full`, roles launch with `--dangerously-skip-permissions` (Claude, Antigravity) or `--dangerously-bypass-approvals-and-sandbox` (Codex). `supervised` adds nothing.
+- Protocol version 2: agents act freely inside the project and its worktrees; the PM and reviewers may answer a teammate's prompt with `hc keys`; owner decisions are parked in `QUESTION.md` while the team continues; hard lines (outside the project, default-branch force-push, spend, secrets off the machine, merge/release/deploy per `human_approval`) always go to the owner. Launch prompts, skills and SECURITY.md follow the mode.
+- `agentorg team watch [--loop --interval N --stale-minutes M]` wakes the PM with `hc send --if idle` when tasks are stale or no role is working; `team status` flags `stale` tasks.
+- Bootstrap proposal table is `Title | Level | Account | Model | Effort | Focus`, chosen from what each provider offers, plus autonomy and approval flags in the one question.
+- Mock-tested only; not yet verified live with real providers or `hc send --if idle` against a running PM.
+
 ## 0.7.0 - one-question team setup
 - `agent-org-bootstrap` is rewritten around one question: the PM reads the repo, detects accounts, and sends one proposal (accounts, team table, PROJECT/ROADMAP summary); after a single "yes" it configures, commits `.ai/` and runs `team up --apply`.
 - `agentorg profile detect [--add]`: finds `~/.claude`, `~/.claude-*`, `~/.codex`, `~/.codex-*` and `agy` by existence checks only (no file is opened). The default dirs are stored as `config_dir: null`; `--add` skips an alias already used by a different profile.

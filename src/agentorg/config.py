@@ -11,6 +11,7 @@ from pathlib import Path
 ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
 PROVIDERS = {"claude", "codex", "antigravity"}
 ROLE_MODES = {"worker", "reviewer", "researcher", "observer"}
+AUTONOMY = ("full", "supervised")
 
 
 class OrgError(Exception):
@@ -95,6 +96,8 @@ def validate_project(doc) -> dict:
     validate_id(doc.get("project_id"), "project_id")
     if doc.get("kind") not in ("software", "research", "content", "general"):
         raise OrgError("Project kind must be software, research, content, or general")
+    if doc.get("autonomy", "supervised") not in AUTONOMY:
+        raise OrgError("autonomy must be full or supervised")
     roles = doc.get("roles")
     if not isinstance(roles, list) or not roles:
         raise OrgError("TEAM.json must contain at least one role")
@@ -136,6 +139,11 @@ def validate_project(doc) -> dict:
     if not isinstance(policies, dict) or not isinstance(policies.get("max_parallel_workers", 1), int) or policies.get("max_parallel_workers", 1) < 1:
         raise OrgError("policies.max_parallel_workers must be a positive integer")
     return doc
+
+
+def autonomy(doc: dict) -> str:
+    """A project without the field keeps the pre-0.8 behavior."""
+    return doc.get("autonomy", "supervised")
 
 
 def template_document(name: str):

@@ -3,6 +3,7 @@
   "project_id": "change-me",
   "kind": "content",
   "experimental": true,
+  "autonomy": "full",
   "human_approval": {
     "publish": true,
     "significant_spend": true,

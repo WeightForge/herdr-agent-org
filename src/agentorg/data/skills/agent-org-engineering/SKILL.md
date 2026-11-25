@@ -7,8 +7,8 @@ description: Reviewer-led multi-agent software engineering loop using Herdr and 
 
 ## Running the CLI
 
-Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.7.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.7.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.7.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
-<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.7.0`. tests/test_plugins.py checks the pin against __version__. -->
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.8.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.8.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.8.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.8.0`. tests/test_plugins.py checks the pin against __version__. -->
 
 Use existing repository build/test/security/contribution instructions as source of truth. A good engineering loop minimizes PM calls, noisy PRs, duplicated agents and branch conflicts.
 
@@ -38,7 +38,8 @@ One write owner per worktree. Workers may run tasks in parallel only if interfac
 4. Apply reviewer feedback, retest and send change/evidence to the reviewer, up to the agreed RCA threshold.
 5. Do not label work done solely because tests were invoked; the reviewer must verify. Do not merge/deploy/publish without human approval.
 6. Stay inside your worktree and task scope; out-of-scope requests become a `scope_change` to your reviewer. Stop at once when a task is cancelled or re-assigned.
-7. If you are blocked on a permission prompt, tell your reviewer the exact command you wait on; never use `hc keys`.
+7. If you are blocked on a permission prompt, tell your reviewer the exact command you wait on; never use `hc keys` (in `full` autonomy your reviewer or the PM answers it).
+8. In `full` autonomy (protocol, Autonomy) act freely inside your worktree: edit, delete, test, install project dependencies, commit, `git push` your branch, open a PR. Anything outside it, or a hard line, is not yours to do: tell your reviewer and continue other work.
 
 ## Reviewer-owned feedback and QA loop
 
@@ -49,7 +50,8 @@ The reviewer is the Herdr parent of its paired workers, so hc notes about them (
 3. Send actionable findings **directly to the worker** with severity, location, expected correction and reproduction. Do not ask the PM to relay comments.
 4. Count consecutive UNPRODUCTIVE rounds in `progress.md`. At `policies.review_rounds_before_rca` (default 3) stop patch churn; require root-cause analysis, minimal reproduction and a regression test. Reviewer may take over implementation only exceptionally, after recording ownership change and arranging a second independent verifier.
 5. When validation passes and gates are met, escalate one `milestone_ready` (a review-ready PR is not permission to merge). Escalate immediately only with `blocked`, `scope_change`, `safety_or_cost_risk`, `requires_owner_decision` or `review_exhausted`. File format and delivery: protocol.
-6. When a worker is blocked on a permission prompt, escalate `blocked` with the exact command it waits on; never use `hc keys`. The human approves.
+6. When a worker is blocked on a permission prompt, escalate `blocked` with the exact command it waits on. `supervised`: never use `hc keys`; the human approves. `full`: you may answer a worker's permission or trust prompt with `hc keys` (never copy prompt text into files); anything else the prompt asks for beyond the protocol's hard lines stays blocked.
+7. In `full` autonomy an owner decision never stops the loop: escalate `requires_owner_decision` with options and a recommended answer, mark the task `blocked`, and give the worker other work in scope.
 
 ## Engineering quality gate
 
@@ -59,5 +61,5 @@ Measurable acceptance criteria, real test evidence (including honest failures), 
 
 - Do **not** wake PM for every tool call, turn, PR comment or test iteration. Use reviewer as local coordination owner until ready to escalate.
 - If agent-to-agent messaging is unavailable, persist a handoff report in the repo/PR, not a claim that a message was delivered.
-- `hc` does not create a durable task scheduler; do not imply endless autonomous progress without a running PM or watcher. Respect idle, crash, context/usage limits and human gates.
+- `hc` does not create a durable task scheduler; do not imply endless autonomous progress without a running PM or watcher (`agentorg team watch --loop`). Respect idle, crash, context/usage limits and human gates.
 - PM decides milestones and dependencies; Reviewer decides whether the reviewed slice meets the quality gate; Worker does the implementation.

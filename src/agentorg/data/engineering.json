@@ -2,6 +2,7 @@
   "schema_version": 2,
   "project_id": "change-me",
   "kind": "software",
+  "autonomy": "full",
   "human_approval": {
     "merge": true,
     "release": true,
