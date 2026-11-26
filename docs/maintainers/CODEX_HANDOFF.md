@@ -1,4 +1,4 @@
-# Maintainer handoff (0.9.0)
+# Maintainer handoff (1.0.0)
 
 Short orientation for the next maintainer or coding agent. Read `README.md`, `docs/ARCHITECTURE.md`, `SECURITY.md` and `AGENTS.md` first.
 
@@ -29,10 +29,9 @@ Use `PYTHONPATH=src` (or an editable install of this checkout) so tests import t
 ## Open priorities
 
 1. Live testing across Windows, Linux and Herdr versions, including the bootstrap flow with each provider.
-2. Event-driven watcher with a persistent checkpoint (today `team watch` polls task files and role status; it does not read terminal output).
-3. Enforce `max_parallel_workers` (currently PM policy, not a process cap).
-4. CI/PR adapters and mature research/content templates.
-5. Publishing to PyPI (see `PUBLISHING.md`).
+2. Watcher: it polls task files, the inbox and QUESTION.md (not terminal output) and keeps a persistent checkpoint of announced events in `RUNTIME.json`. `max_parallel_workers` is only warned about, never a hard cap.
+3. CI/PR adapters and mature research/content templates.
+4. Publishing to PyPI (see `PUBLISHING.md`).
 
 ## Rules that must not regress
 

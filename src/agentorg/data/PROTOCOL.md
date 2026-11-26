@@ -21,9 +21,9 @@ Authoritative for every role (PM, reviewer, worker). Skills and launch prompts o
 
 - Inside the project and its worktrees agents act freely: edit and delete files (git can recover them), run tests, install project dependencies, commit, `git push` team branches, open PRs.
 - The PM and reviewers may use `hc keys` to answer a teammate's permission or trust prompt (for example the first-run folder trust prompt). Workers never do; a blocked worker escalates `blocked` to its reviewer.
-- Owner decisions never stop the team. The reviewer escalates `requires_owner_decision`; the PM appends the question to `QUESTION.md` with options and a recommended answer, the task stays `blocked` (parked), and everyone continues other tasks. On every wake the PM reads `QUESTION.md`, and when the owner has answered, tells the reviewer to set the task `started` again.
+- Owner decisions never stop the team. The reviewer escalates `requires_owner_decision`; the PM appends the question to `QUESTION.md` with options, a recommended answer and an empty `Answer:` line for the owner, the task stays `blocked` (parked), and everyone continues other tasks. On every wake the PM reads `QUESTION.md`, and when the owner has answered, tells the reviewer to set the task `started` again.
 - Hard lines, always a `QUESTION.md` entry and never done by an agent: changing or deleting anything outside the project and its worktrees or on the system; force-push or history rewrite of the default branch; spending money or paid sign-ups; sending secrets or tokens off the machine; merge, release and deploy as gated by `human_approval` in `TEAM.json`. The team keeps working on everything else.
-- The PM runs `agentorg team watch --loop` in its own terminal (`hc run`); it wakes the PM when tasks go stale (`stale` flag in `team status`) or every role is idle while tasks are open.
+- The PM runs `agentorg team watch --loop` in its own terminal (`hc run`); it wakes the PM when tasks go stale (`stale` flag in `team status`) or every role is idle while tasks are open, when a new `.ai/inbox/*.md` file appears that is not under "Handled escalations", and when the owner answers in `QUESTION.md`. An answer is a line starting with `Answer:`; the PM changes a handled one to `Answered:`. Each event wakes once (announced inbox ids and answers are kept in `RUNTIME.json`); wake messages also carry the concurrency warnings.
 
 ## File layout
 
@@ -43,7 +43,7 @@ Root checkout = the project directory holding `.ai/TEAM.json`. All paths below a
 
 `.ai/tasks/` is versioned project state (do not gitignore). `.ai/inbox/` and `RUNTIME.json` are gitignored.
 
-Packet fields: `TASK <id>`, `Protocol version: <n>`, Objective, Scope / worktree+branch, Acceptance criteria, Expected tests, Reviewer, `blocked_by: <task id or none>`, Exit conditions / permission gates.
+Packet fields: `TASK <id>`, `Protocol version: <n>`, Objective, Scope / worktree+branch, Acceptance criteria, Expected tests, Reviewer, `blocked_by: <task id or none>`, Exit conditions / permission gates. Optional (an older packet without them still parses): `Worker: <role id>`, `Paths: <comma-separated repo paths or globs this task writes>`, `Test command: <exact command>`. `team status` uses `Worker` and `Paths` to warn (never block) when one worker holds several active tasks or two active tasks' paths overlap; a `reassign.md` `Worker` overrides the packet's.
 
 `progress.md` fields (reviewer only), one per line: `Protocol version: <n>`, `State: <state>`, `Waiting-on: <task id>` (only while held by a dependency), `Reassign-ack: <n>`, consecutive UNPRODUCTIVE rounds (the RCA counter), accepted dependency commits, evidence refs as `<branch>@<commit>:<path>`.
 
@@ -89,7 +89,7 @@ PM on every wake: read `.ai/inbox/*.md`, skip ids listed under "Handled escalati
 
 ## Handoffs and review
 
-Worker: commit the report to your branch at `.ai/handoff/<task>.md` BEFORE `hc send`, then send the reviewer `<branch>@<commit>:.ai/handoff/<task>.md` and a one-line summary. Reviewer reads it with `git show <commit>:.ai/handoff/<task>.md`. Count consecutive UNPRODUCTIVE rounds in `progress.md`; at `policies.review_rounds_before_rca` (default 3) stop patch churn and require root-cause analysis.
+Worker: commit the report to your branch at `.ai/handoff/<task>.md` BEFORE `hc send`, then send the reviewer `<branch>@<commit>:.ai/handoff/<task>.md` and a one-line summary. Reviewer reads it with `git show <commit>:.ai/handoff/<task>.md`, starts the review from the worker's commit diff and test evidence (re-running the packet's `Test command`), then widens to the rest of the tree. Count consecutive UNPRODUCTIVE rounds in `progress.md`; at `policies.review_rounds_before_rca` (default 3) stop patch churn and require root-cause analysis.
 
 Workers stay inside their worktree and the packet scope. A request to touch another worktree or out-of-scope files becomes a `scope_change` to the reviewer.
 

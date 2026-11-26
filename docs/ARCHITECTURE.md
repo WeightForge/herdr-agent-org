@@ -63,7 +63,7 @@ Codex is launched with `--no-daemon` (`hc --skill`: otherwise its commands execu
 
 ## Roadmap beyond preview
 
-1. Event-driven watcher with fault-safe persistent checkpoint, no busy polling and no accidental duplicates.
+1. Fully event-driven watcher (today it polls files, wakes once per inbox file or QUESTION.md answer, and keeps announced ids in `RUNTIME.json`; it does not read terminal output).
 2. End-to-end testing on Windows, Linux and Herdr App versions, including slow agent startup and profile switching.
 3. Config schema validation, onboarding TUI/GUI, migration from v1 `TEAM.yaml` and verified runtime capacities.
 4. CI/PR adapter, optional task tracker adapters, rate limit/resume audit, security hardening and provider-specific capability verification.

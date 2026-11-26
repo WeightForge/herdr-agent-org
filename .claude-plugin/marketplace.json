@@ -6,7 +6,7 @@
     {
       "name": "agent-org",
       "description": "PM, reviewer and worker AI teams on Herdr, with the agentorg CLI run via PATH or uvx.",
-      "version": "0.9.0",
+      "version": "1.0.0",
       "source": "./src/agentorg/data",
       "category": "development"
     }

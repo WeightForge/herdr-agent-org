@@ -12,10 +12,10 @@ from pathlib import Path
 
 from . import __version__
 from .config import (OrgError, load_profiles, save_profiles, profiles_path, validate_id,
-                     load_project, validate_project, known_projects, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
+                     load_project, validate_project, known_projects, register_project, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
 from .runtime import (blocked_info, redact_record, start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
                       existing_terminal, run_process, validate_binaries, which, stop_team, inbox_pending,
-                      install_protocol, task_states, pending_owner_decisions, watch_once, STALE_MINUTES,
+                      install_protocol, task_states, team_warnings, cleanup_report, _active, pending_owner_decisions, watch_once, STALE_MINUTES,
                       resume_team, register_pm, resume_pm_process, discover_sessions)
 
 
@@ -79,12 +79,12 @@ def add_parser() -> argparse.ArgumentParser:
 
     q = sub.add_parser("team", help="Plan, launch and monitor Herdr team")
     ts = q.add_subparsers(dest="op", required=True)
-    for op in ("plan", "up", "status", "reconcile", "down", "watch"):
+    for op in ("plan", "up", "status", "reconcile", "down", "watch", "cleanup"):
         a = ts.add_parser(op)
         a.add_argument("--path", default=".")
         if op == "up":
             a.add_argument("--no-panes", action="store_true", help="Do not show roles as panes in the current Herdr App tab")
-        if op in ("up", "down"):
+        if op in ("up", "down", "cleanup"):
             a.add_argument("--apply", action="store_true", help="Required to actually create/stop worktrees and agents")
         if op in ("status", "reconcile", "watch"):
             a.add_argument("--stale-minutes", type=float, default=STALE_MINUTES, help="Minutes without task activity before a task is stale")
@@ -150,7 +150,7 @@ def init_project(ns):
         ".ai/ROADMAP.md": "# Capability milestones (no dates required)\n\n## M0 — Foundations\n- [ ] Identify critical assumptions, tests, and dependencies\n\n## Next\n- [ ] Define first meaningful deliverable and acceptance criteria\n",
         ".ai/STATE.md": "# Project checkpoint\n\n## Current milestone\nM0 — Foundations\n\n## Active tasks\nNone yet.\n\n## Open PRs/artifacts\nNone yet.\n\n## Blockers\nNone yet.\n\n## Handled escalations\nNone yet. The PM appends inbox ids here before moving files to inbox/done/.\n\n## Next action\nReview project scope and assign first scoped task.\n",
         ".ai/DECISIONS.md": "# Decisions\n\nRecord context, options, chosen action, evidence, and reversible/irreversible impacts.\n",
-        "QUESTION.md": "# Questions for the human owner\n\nRecord only decisions requiring human approval, with options, recommendation and safe work while awaiting answer.\n",
+        "QUESTION.md": "# Questions for the human owner\n\nRecord only decisions requiring human approval, with options, recommendation and safe work while awaiting answer.\nOwner: write your answer after the `Answer:` line under each question.\n",
         ".ai/.gitignore": "RUNTIME.json\ninbox/\n",
     }
     created, skipped = [], []
@@ -394,6 +394,8 @@ def team_cmd(ns):
         return
     root = rootpath(ns.path)
     doc = load_project(root)
+    if ns.op in ("status", "watch"):
+        register_project(root)  # teams created before 0.9.0 never ran team up --apply since
     if ns.op in ("plan", "up"):
         report = {}
         items = start_team(root, apply=(ns.op == "up" and ns.apply), panes=not getattr(ns, "no_panes", False), report=report)
@@ -408,6 +410,11 @@ def team_cmd(ns):
         print(json.dumps(out, indent=2))
         if ns.op == "up" and not ns.apply:
             print("No agents started. Add --apply to launch.")
+        return
+    if ns.op == "cleanup":
+        print(json.dumps({"mode": "apply" if ns.apply else "dry_run", "tasks": cleanup_report(root, apply=ns.apply)}, indent=2))
+        if not ns.apply:
+            print("Nothing removed. Add --apply to remove clean worktrees and delete merged branches.")
         return
     hc_ready()
     if ns.op == "down":
@@ -427,6 +434,9 @@ def team_cmd(ns):
         name = terminal_name(root, role["id"])
         if existing_terminal(name, role_labels(root, role)) is None:
             raise OrgError(f"Role {role['id']} has no visible live terminal. Run team up --apply first.")
+        busy = [t["id"] for t in task_states(root, full=True) if _active(t) and t["worker"] == role["id"] and t["id"] not in ns.message]
+        if busy:
+            print(f"WARNING: {role['id']} already has active task(s) {', '.join(busy)}; sending anyway.", file=sys.stderr)
         command = ["hc", "send"] + (["--wait"] if ns.wait else []) + [name, ns.message]
         result = run_process(command, timeout=220 if ns.wait else 90)
         if result.returncode not in (0, 124):
@@ -452,14 +462,20 @@ def team_cmd(ns):
             runtime.setdefault("terminals", {}).setdefault(s["role"], {}).update({"name": s["terminal"], "live": s["live"]})
         discover_sessions(runtime)
         write_json(root / ".ai" / "RUNTIME.json", runtime)
-    print(json.dumps({"project": doc["project_id"], "inbox_pending": inbox_pending(root), "blocked": blocked,
-                      "owner_decisions": pending_owner_decisions(root), "tasks": task_states(root, getattr(ns, "stale_minutes", STALE_MINUTES)), "status": status}, indent=2))
+    tasks = task_states(root, getattr(ns, "stale_minutes", STALE_MINUTES), full=True)
+    wake = read_json(root / ".ai" / "RUNTIME.json", default={}).get("watch_last_wake")
+    print(json.dumps({"project": doc["project_id"], "inbox_pending": inbox_pending(root), "blocked": blocked, "warnings": team_warnings(doc, tasks),
+                      "watcher_last_wake": wake, "owner_decisions": pending_owner_decisions(root), "tasks": [{k: v for k, v in t.items() if k not in ("worker", "paths")} for t in tasks], "status": status}, indent=2))
 
 
 def resume_cmd(ns):
     roots = [rootpath(p) for p in known_projects() if (Path(p) / ".ai" / "TEAM.json").exists()] if ns.all else [rootpath(ns.path)]
     out = []
+    if ns.all and not roots:
+        print("No registered projects. Run agentorg resume once inside each project folder to register it.", file=sys.stderr)
     for root in roots:
+        if not ns.all and (root / ".ai" / "TEAM.json").exists():
+            register_project(root)
         try:
             out.append({"project": str(root), "roles": resume_team(root, apply=ns.apply, panes=not ns.no_panes)})
         except OrgError as exc:

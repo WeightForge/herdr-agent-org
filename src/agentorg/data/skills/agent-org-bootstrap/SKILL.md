@@ -7,8 +7,8 @@ description: Set up an AI team for an existing project with one question: detect
 
 ## Running the CLI
 
-Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.9.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.9.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.9.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
-<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.9.0`. tests/test_plugins.py checks the pin against __version__. -->
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `1.0.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v1.0.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==1.0.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==1.0.0`. tests/test_plugins.py checks the pin against __version__. -->
 
 ## One-question flow
 
@@ -34,7 +34,7 @@ Goal: the owner asks once, answers exactly one question, and the team is running
 Contents, in this order:
 
 1. Detected accounts (alias, provider, whether the command was found).
-2. The proposed team as a table: `Title | Level | Account | Model | Effort | Focus`.
+2. The proposed team as a table: `Title | Level | Account | Model | Effort | Focus | Why`, where `Why` is a few words naming the evidence or work area in the repo that justifies the role. Under the table state which tasks can run in parallel (different roles and non-overlapping paths) and which must be sequential.
 3. Two or three lines on what `.ai/PROJECT.md` and `.ai/ROADMAP.md` will say.
 4. Settings the owner can change in the same reply: autonomy (default `full`: agents run without permission prompts and park owner decisions in `QUESTION.md`; or `supervised`) and the approval flags for merge, release and deploy (default: the owner approves each, as in `human_approval`).
 5. The single question: **Start this team, or tell me what to change?**

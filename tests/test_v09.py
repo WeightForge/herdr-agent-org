@@ -149,7 +149,7 @@ class LaunchTest(Fixture):
         c = self.argv_for("claude", "claude", resume=UUID)
         self.assertEqual(c[1:], ["--dangerously-skip-permissions", "--resume", UUID])
         c = self.argv_for("codex", "codex", resume=UUID)
-        self.assertEqual(c[1:4], ["resume", "--no-daemon", "--dangerously-bypass-approvals-and-sandbox"])
+        self.assertEqual(c[1:6], ["resume", "--no-daemon", "-c", "check_for_update_on_startup=false", "--dangerously-bypass-approvals-and-sandbox"])
         self.assertEqual(c[-1], UUID)
         c = self.argv_for("antigravity", "agy", resume=UUID)
         self.assertEqual(c[-2:], ["--conversation", UUID])
@@ -231,6 +231,15 @@ class SessionDiscoveryTest(Fixture):
         with patch("agentorg.runtime._run_provider", side_effect=lambda cmd, env: cmd):
             cmd = runtime.resume_pm_process(self.project)
         self.assertEqual(cmd[1:7], ["--model", "opus", "--effort", "high", "--resume", UUID])
+
+    def test_pm_resumes_with_full_autonomy_flag(self):
+        # live: a full-autonomy PM came back in plain permission mode
+        self.init(autonomy="full")
+        with patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": UUID, "HC_TERMINAL_ID": "t5"}):
+            runtime.register_pm(self.project)
+        with patch("agentorg.runtime._run_provider", side_effect=lambda cmd, env: cmd):
+            cmd = runtime.resume_pm_process(self.project)
+        self.assertEqual(cmd[1:4], ["--dangerously-skip-permissions", "--resume", UUID])
 
     def test_register_pm_without_provider_hint_fails(self):
         self.init()

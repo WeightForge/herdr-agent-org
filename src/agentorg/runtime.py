@@ -1,6 +1,7 @@
 """Runtime boundaries: Herdr transport, Git worktrees and provider CLI."""
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import os
@@ -220,8 +221,8 @@ def start_team(project: Path, *, apply: bool = False, panes: bool = True, report
     if issues:
         raise OrgError("Cannot plan/start team:\n" + "\n".join("- " + x for x in issues))
     workers = [r for r in doc["roles"] if r.get("enabled", True) and r["mode"] == "worker"]
-    # Max parallel *work* is a PM task-allocation policy; idle role terminals are
-    # not active jobs. Runtime enforcement is intentionally out of scope for v0.2.
+    # Max parallel *work* is a PM task-allocation policy; idle role terminals are not active jobs.
+    # It is never a hard cap: team status and the watcher only warn (see team_warnings).
     if doc["kind"] == "software" and workers and doc.get("policies", {}).get("isolate_worker_worktrees", True):
         git_root(project)
         if apply:
@@ -416,19 +417,24 @@ def _age_min(d: Path, now: float) -> float:
     return (now - max(stamps)) / 60 if stamps else 0.0
 
 
-def task_states(project: Path, stale_minutes: float = STALE_MINUTES, now: float | None = None) -> list[dict]:
-    """Per-task state derived from .ai/tasks/*/ files only (see PROTOCOL.md). No stored state."""
+def task_states(project: Path, stale_minutes: float = STALE_MINUTES, now: float | None = None, full: bool = False) -> list[dict]:
+    """Per-task state derived from .ai/tasks/*/ files only (see PROTOCOL.md). No stored state. full adds worker and paths."""
     now = time.time() if now is None else now
     base = project / ".ai" / "tasks"
+    roles = [r for r in read_json(project / ".ai" / "TEAM.json", default={}).get("roles", []) if r.get("mode") == "worker"]
     rows = {}
     for packet in sorted(base.glob("*/packet.md")):
         tid = packet.parent.name
         d = packet.parent
         progress = _read(d / "progress.md") if (d / "progress.md").exists() else None
-        dep = _field(_read(packet), "blocked_by")
-        rows[tid] = (d, progress, dep)
+        text = _read(packet)
+        dep = _field(text, "blocked_by")
+        reassign = _read(d / "reassign.md") if (d / "reassign.md").exists() else ""
+        worker = _field(reassign, "Worker") or _field(text, "Worker") or _guess_worker(roles, text)  # a reassignment names the new worker
+        paths = re.search(r"^Paths:[ \t]*(.+)$", text, re.M | re.I)
+        rows[tid] = (d, progress, dep, worker, paths.group(1) if paths else "")
     result = []
-    for tid, (d, progress, dep) in rows.items():
+    for tid, (d, progress, dep, worker, paths) in rows.items():
         flags = []
         if (d / "cancel").exists():
             state, nxt = "cancelled", "none"
@@ -448,8 +454,51 @@ def task_states(project: Path, stale_minutes: float = STALE_MINUTES, now: float 
                     flags.append("unknown_delivery")
         if state not in ("done", "cancelled", "blocked") and _age_min(d, now) >= stale_minutes:
             flags.append("stale")
-        result.append({"id": tid, "state": state, "next_actor": nxt, "flags": flags})
-    return result
+        result.append({"id": tid, "state": state, "next_actor": nxt, "flags": flags, "worker": worker, "paths": _paths(paths)})
+    active = [t for t in result if _active(t)]
+    for t in active:
+        if t["worker"] and any(o is not t and o["worker"] == t["worker"] for o in active):
+            t["flags"].append("worker_busy")
+        t["flags"] += [f"overlap:{o['id']}" for o in active if o is not t and _overlap(t["paths"], o["paths"])]
+    return result if full else [{k: v for k, v in t.items() if k not in ("worker", "paths")} for t in result]  # status output keeps its old shape
+
+
+def _guess_worker(workers: list, packet: str) -> str | None:
+    """Packets written before the Worker field (live, 0.9 PM): the one worker named in the packet, else the one paired with its Reviewer."""
+    named = [r["id"] for r in workers if re.search(rf"(?<![\w-]){re.escape(r['id'])}(?![\w-])", packet)]
+    if len(named) != 1:
+        reviewer = _field(packet, "Reviewer")
+        named = [r["id"] for r in workers if reviewer and r.get("reviewer_role") == reviewer]
+    return named[0] if len(named) == 1 else None
+
+
+def _active(task: dict) -> bool:
+    return task["state"] not in ("done", "cancelled", "blocked")
+
+
+def _paths(value: str) -> list[str]:
+    out = [p.strip().replace("\\", "/").removeprefix("./").rstrip("/") for p in value.split(",")]
+    return [p for p in out if p]
+
+
+def _overlap(a: list, b: list) -> bool:
+    # shortcut: fnmatch's * also crosses "/", so globs may over-report overlap; fine for a warning.
+    return any(x == y or x.startswith(y + "/") or y.startswith(x + "/") or fnmatch.fnmatch(x, y) or fnmatch.fnmatch(y, x)
+               for x in a for y in b)
+
+
+def team_warnings(doc: dict, tasks: list[dict]) -> list[str]:
+    """Advice only, never a block: too many active tasks, a busy worker, overlapping Paths."""
+    active = [t for t in tasks if _active(t)]
+    warnings = []
+    limit = doc.get("policies", {}).get("max_parallel_workers")
+    if limit and len(active) > limit:
+        warnings.append(f"active tasks {len(active)} exceed policies.max_parallel_workers {limit}")
+    for t in active:
+        if "worker_busy" in t["flags"]:
+            warnings.append(f"task {t['id']}: worker {t['worker']} has more than one active task")
+        warnings += [f"tasks {t['id']} and {f[8:]} have overlapping Paths" for f in t["flags"] if f.startswith("overlap:") and t["id"] < f[8:]]
+    return warnings
 
 
 def pending_owner_decisions(project: Path) -> list[str]:
@@ -469,33 +518,71 @@ def _working(record) -> bool:
     return _status(record) == "working"
 
 
+ANSWER_RE = re.compile(r"^\s*(?:[-*]\s*)?\**Answer\**:\**[ \t]*\S", re.I)  # "Answered:" (handled) does not match
+
+
+def _question_files(project: Path) -> list[Path]:
+    return [f for f in (project / "QUESTION.md", project / ".ai" / "QUESTION.md") if f.is_file()]
+
+
+def _answers(project: Path) -> list[str]:
+    """One key per owner answer line, tied to the question heading above it, so two questions answered alike stay distinct."""
+    keys = []
+    for f in _question_files(project):
+        heading = ""
+        for line in _read(f).splitlines():
+            if line.startswith("#"):
+                heading = line.strip()
+            elif ANSWER_RE.match(line):
+                keys.append(hashlib.sha256(f"{heading}|{line.strip()}".encode()).hexdigest()[:16])
+    return keys
+
+
+def _watch_events(project: Path, runtime: dict) -> tuple[list[str], list[str], list[str]]:
+    """New wake events as (messages, inbox ids, answer keys): escalations not handled or announced, an owner answer not seen before."""
+    handled, announced = _read(project / ".ai" / "STATE.md"), runtime.get("announced", [])
+    ids = [f.stem for f in sorted((project / ".ai" / "inbox").glob("*.md")) if f.stem not in handled and f.stem not in announced]
+    msgs = [f"WATCHDOG: new escalation .ai/inbox/{i}.md" for i in ids]
+    # Keyed by answer text, not mtime: the PM editing QUESTION.md must not re-wake it for an answer it already got (live).
+    fresh = [k for k in _answers(project) if k not in runtime.get("answers_seen", [])]
+    if fresh:
+        msgs.append("WATCHDOG: owner answered QUESTION.md")
+    return msgs, ids, fresh
+
+
 def watch_once(project: Path, stale_minutes: float = STALE_MINUTES, now: float | None = None) -> dict:
-    """One watchdog check: wake an idle or done PM (hc send) when open tasks are stale or nobody is working."""
+    """One watchdog check: wake an idle or done PM (hc send) on a new escalation, an owner answer, or stale/idle open tasks."""
     now = time.time() if now is None else now
     doc = load_project(project)
-    open_tasks = [t for t in task_states(project, stale_minutes, now) if t["state"] not in ("done", "cancelled", "blocked")]
-    if not open_tasks:
-        return {"action": "none", "reason": "no open tasks"}
-    stale = [t["id"] for t in open_tasks if "stale" in t["flags"]]
-    working = False
-    for role in doc["roles"]:
-        if role.get("enabled", True) and not working:
-            try:
-                working = _working(existing_terminal(terminal_name(project, role["id"]), role_labels(project, role)))
-            except OrgError:
-                pass  # an unreadable terminal is not proof of work; a looping watcher must not crash
-    quiet = min(_age_min(project / ".ai" / "tasks" / t["id"], now) for t in open_tasks)
-    if not stale and (working or quiet < 2):  # 2 min: a task just dispatched is not idle yet
-        return {"action": "none", "reason": "work in progress"}
+    tasks = task_states(project, stale_minutes, now, full=True)
+    open_tasks = [t for t in tasks if _active(t)]
     runtime_file = project / ".ai" / "RUNTIME.json"
     runtime = read_json(runtime_file, default={"schema_version": 2, "terminals": {}})
+    events, new_ids, new_answers = _watch_events(project, runtime)
+    stale = [t["id"] for t in open_tasks if "stale" in t["flags"]]
+    if not events:  # only the stale wake needs open tasks, and it is throttled
+        if not open_tasks:
+            return {"action": "none", "reason": "no open tasks"}
+        working = False
+        for role in doc["roles"]:
+            if role.get("enabled", True) and not working:
+                try:
+                    working = _working(existing_terminal(terminal_name(project, role["id"]), role_labels(project, role)))
+                except OrgError:
+                    pass  # an unreadable terminal is not proof of work; a looping watcher must not crash
+        quiet = min(_age_min(project / ".ai" / "tasks" / t["id"], now) for t in open_tasks)
+        if not stale and (working or quiet < 2):  # 2 min: a task just dispatched is not idle yet
+            return {"action": "none", "reason": "work in progress"}
     pm = pm_terminal(runtime.get("pm_terminal") or "") or pm_terminal()
     if not pm:
         return {"action": "none", "reason": "no PM terminal known", "stale": stale}
-    if now - runtime.get("watch_woke_at", 0) < stale_minutes * 60:
+    if not events and now - runtime.get("watch_woke_at", 0) < stale_minutes * 60:
         return {"action": "none", "reason": "PM woken recently", "stale": stale}
-    msg = ("WATCHDOG: open tasks are stale or all roles are idle. Run agentorg team status, check QUESTION.md for owner answers, "
-           "then reassign, unblock or unpark the tasks.")
+    msg = "; ".join(events) or ("WATCHDOG: open tasks are stale or all roles are idle. Run agentorg team status, check QUESTION.md for owner answers, "
+                                "then reassign, unblock or unpark the tasks.")
+    warnings = team_warnings(doc, tasks)
+    if warnings:
+        msg += " Warnings: " + "; ".join(warnings) + "."
     try:
         pm_status = _status(existing_terminal(pm))
     except OrgError:
@@ -507,8 +594,63 @@ def watch_once(project: Path, stale_minutes: float = STALE_MINUTES, now: float |
     if sent.returncode != 0:
         return {"action": "send_skipped", "reason": (sent.stderr or sent.stdout).strip()[:200], "stale": stale}
     runtime["watch_woke_at"] = now
+    runtime["watch_last_wake"] = {"at": now, "reason": events[0] if len(events) == 1 else "; ".join(events) if events else "stale or idle tasks"}
+    runtime["announced"] = [*runtime.get("announced", []), *new_ids]
+    runtime["answers_seen"] = [*runtime.get("answers_seen", []), *new_answers]
     write_json(runtime_file, runtime)
-    return {"action": "woke_pm", "pm": pm, "stale": stale}
+    return {"action": "woke_pm", "pm": pm, "stale": stale, "events": events}
+
+
+def cleanup_report(project: Path, *, apply: bool = False) -> list[dict]:
+    """Report the worktree and branch of each finished task; with apply remove only clean worktrees and `-d` merged branches."""
+    doc = load_project(project)
+    tasks = task_states(project, full=True)
+    roles = {r["id"]: r for r in doc["roles"]}
+    base = run_process(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], cwd=project)
+    default = base.stdout.strip() if base.returncode == 0 and base.stdout.strip() else git("branch", "--show-current", cwd=project)
+    merged = set(git("branch", "--format=%(refname:short)", "--merged", default, cwd=project).split())
+    by_worker = {}  # one worker worktree serves many tasks: decide once per worker
+    rows = []
+    for t in tasks:
+        if t["state"] not in ("done", "cancelled"):
+            continue
+        w = t["worker"]
+        if w not in by_worker:
+            role = roles.get(w)
+            busy = [o["id"] for o in tasks if _active(o) and o["worker"] == w]
+            if not role or role["mode"] != "worker":
+                info = {"worker": w, "action": "kept", "reason": "worker role unknown or not a worker"}
+            else:
+                loc, branch = worktree_info(project, role)
+                exists = loc.exists()
+                dirty = bool(git("status", "--porcelain", cwd=loc)) if exists else False
+                has_branch = run_process(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], cwd=project).returncode == 0
+                info = {"worker": w, "worktree": str(loc) if exists else None, "branch": branch if has_branch else None,
+                        "merged": branch in merged, "dirty": dirty, "action": "kept"}
+                try:
+                    live = existing_terminal(terminal_name(project, w), role_labels(project, role)) is not None
+                except OrgError:
+                    live = True  # cannot tell: never pull a worktree out from under a running agent
+                reason = (f"active task(s) use it: {', '.join(busy)}" if busy else "worker terminal is live; run team down first" if exists and live
+                          else "uncommitted or untracked files" if dirty
+                          else "branch not merged" if has_branch and branch not in merged else None)
+                if reason:
+                    info["reason"] = reason
+                elif not apply:
+                    info["action"] = "would_remove"
+                else:
+                    ok = True
+                    if exists:
+                        r = run_process(["git", "worktree", "remove", str(loc)], cwd=project, timeout=60)
+                        ok = r.returncode == 0
+                        info["worktree_result"] = "removed" if ok else "kept: " + (r.stderr.strip() or r.stdout.strip())
+                    if ok and has_branch:
+                        r = run_process(["git", "branch", "-d", branch], cwd=project)
+                        info["branch_result"] = "deleted" if r.returncode == 0 else "kept: " + (r.stderr.strip() or r.stdout.strip())
+                    info["action"] = "removed" if ok else "kept"
+            by_worker[w] = info
+        rows.append({"task": t["id"], "state": t["state"], **by_worker[w]})
+    return rows
 
 
 def kill_and_remove(name: str) -> tuple[bool, bool]:
@@ -630,6 +772,10 @@ def _provider_env(provider: str, config_dir: str | None) -> dict:
     return env
 
 
+# --no-daemon: hc --skill, else commands run outside hc. No update check: on resume it is a menu that stalls an unattended agent (live).
+CODEX_FLAGS = ["--no-daemon", "-c", "check_for_update_on_startup=false"]
+
+
 def _resume_cmd(provider: str, command: str, flags: list, session: str, prompt: str | None = None) -> list[str]:
     """Reopen a provider conversation: an id, or "last" (most recent in the cwd) when none was recorded."""
     last = session == "last"
@@ -659,7 +805,7 @@ def launch_agent_process(project: Path, role_id: str, pm: str | None = None, ses
     env = _provider_env(provider, profile.get("config_dir"))
     model = role.get("model") or profile.get("model")
     effort = role.get("effort") or profile.get("effort")
-    flags = ["--no-daemon"] if provider == "codex" else []  # hc --skill: else commands run outside hc
+    flags = CODEX_FLAGS[:] if provider == "codex" else []
     if autonomy(doc) == "full":
         flags.append("--dangerously-bypass-approvals-and-sandbox" if provider == "codex" else "--dangerously-skip-permissions")
     if profile.get("native_profile"):
@@ -775,7 +921,9 @@ def resume_pm_process(project: Path):
     provider = pm.get("provider")
     if provider not in PROVIDER_COMMAND or not SESSION_RE.fullmatch(pm.get("session_id") or ""):
         raise OrgError("No registered PM session; run agentorg pm register inside the PM first.")
-    flags = ["--no-daemon"] if provider == "codex" else []
+    flags = CODEX_FLAGS[:] if provider == "codex" else []
+    if autonomy(load_project(project)) == "full":  # an unattended team must not leave its resumed PM at permission prompts
+        flags.append("--dangerously-bypass-approvals-and-sandbox" if provider == "codex" else "--dangerously-skip-permissions")
     if pm.get("model"):
         flags += ["-m" if provider == "codex" else "--model", pm["model"]]
     if pm.get("effort"):
