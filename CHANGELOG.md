@@ -1,3 +1,6 @@
+## 1.0.1 - Codex workers pick up their tasks
+- Fix (found live in Herdr App): Codex roles start with `-c disable_paste_burst=true`. `hc send` types fast, so Codex treated a dispatch as a paste and kept the Enter as a newline. The message sat unsent in the composer and the worker never started (seen twice as `unknown_delivery`). Verified live: without the flag the same message stayed in the composer, and with it Codex started work at once.
+
 ## 1.0.0 - concurrency warnings, event wakes, cleanup, adaptive bootstrap
 All items are unit-tested with mocked `hc` and git state (`tests/test_v10.py`). The last two bullets list what was verified live and what was not.
 - Packet fields: optional `Worker: <role id>`, `Paths: <comma-separated paths or globs>` and `Test command: <exact command>` (PROTOCOL.md, manager and engineering skills). Old packets still parse; Protocol version stays 2. Reviewers start from the worker's commit diff and test evidence, then widen.

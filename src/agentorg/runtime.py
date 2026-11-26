@@ -773,7 +773,8 @@ def _provider_env(provider: str, config_dir: str | None) -> dict:
 
 
 # --no-daemon: hc --skill, else commands run outside hc. No update check: on resume it is a menu that stalls an unattended agent (live).
-CODEX_FLAGS = ["--no-daemon", "-c", "check_for_update_on_startup=false"]
+# No paste burst: hc send types fast, Codex took it for a paste and kept Enter as a newline, so a dispatch sat unsent (live).
+CODEX_FLAGS = ["--no-daemon", "-c", "check_for_update_on_startup=false", "-c", "disable_paste_burst=true"]
 
 
 def _resume_cmd(provider: str, command: str, flags: list, session: str, prompt: str | None = None) -> list[str]:

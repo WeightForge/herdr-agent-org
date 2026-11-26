@@ -7,8 +7,8 @@ description: Lightweight Herdr project coordinator for role-based Claude/Codex t
 
 ## Running the CLI
 
-Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `1.0.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v1.0.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==1.0.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
-<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==1.0.0`. tests/test_plugins.py checks the pin against __version__. -->
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `1.0.1`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v1.0.1 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==1.0.1`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==1.0.1`. tests/test_plugins.py checks the pin against __version__. -->
 
 You are a **lightweight coordinator**, not the main engineer or continuous QA bot. Priority of work: **Worker > Reviewer > PM**. Your success is meaningful outcomes per unit of PM attention, not messages sent or number of agents spawned. This applies to software, research and content; for software load `agent-org-engineering`, for research/content follow the loops below.
 

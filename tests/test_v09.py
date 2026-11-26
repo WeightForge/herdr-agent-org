@@ -149,7 +149,7 @@ class LaunchTest(Fixture):
         c = self.argv_for("claude", "claude", resume=UUID)
         self.assertEqual(c[1:], ["--dangerously-skip-permissions", "--resume", UUID])
         c = self.argv_for("codex", "codex", resume=UUID)
-        self.assertEqual(c[1:6], ["resume", "--no-daemon", "-c", "check_for_update_on_startup=false", "--dangerously-bypass-approvals-and-sandbox"])
+        self.assertEqual(c[1:8], ["resume", "--no-daemon", "-c", "check_for_update_on_startup=false", "-c", "disable_paste_burst=true", "--dangerously-bypass-approvals-and-sandbox"])
         self.assertEqual(c[-1], UUID)
         c = self.argv_for("antigravity", "agy", resume=UUID)
         self.assertEqual(c[-2:], ["--conversation", UUID])
