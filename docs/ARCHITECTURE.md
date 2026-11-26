@@ -25,7 +25,11 @@ PM (Claude Code or Codex + agent-org-manager skill)
 
 ## Panes
 
-When the PM runs in a Herdr App terminal, `team up --apply` then gives each role a pane in the PM's tab (`herdr-app do terminal.keep`, focusing the anchor pane first): reviewers go down a column, each reviewer's workers to its right. It is best effort and idempotent: panes that exist are skipped, a pane that lands outside the PM's tab is parked and arranging stops, and failures only warn. `--no-panes` disables it.
+When the PM runs in a Herdr App terminal, `team up --apply` then gives each role a pane in the PM's tab (`herdr-app do terminal.keep`, focusing the anchor pane first): reviewers go down a column, each reviewer's workers to its right. It is best effort and idempotent: panes that exist are skipped, a pane that lands outside the PM's tab is parked and arranging stops, and failures only warn. After a role's pane appears it is named `<Title> \· <provider>` (`herdr-app do pane.rename`, cosmetic). `--no-panes` disables it.
+
+## Role skills
+
+A role in `.ai/TEAM.json` may carry `skills`: up to 8 skill names (letters, digits, `- _ . :`; `plugin:skill` for Claude plugin skills). `make_agent_prompt` adds one sentence naming them when the list is non-empty. `agentorg profile skills` (`src/agentorg/skills.py`) discovers what is installed per profile: Claude `<dir>/skills/*` and the installed version of each plugin under `<dir>/plugins/cache/<marketplace>/<plugin>/<version>/` (`installed_plugins.json` says which version); Codex `<home>/skills/*`, `~/.agents/skills/*` and `<home>/plugins/cache/...`; Antigravity `~/.gemini/config/skills/*` and `~/.gemini/config/plugins/*/skills/*`. `team plan` and `team up` warn, never fail, for a role skill not found for its profile. Old manifests without `skills` stay valid.
 
 ## Escalation inbox
 

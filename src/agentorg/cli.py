@@ -12,7 +12,8 @@ from pathlib import Path
 
 from . import __version__
 from .config import (OrgError, load_profiles, save_profiles, profiles_path, validate_id,
-                     load_project, validate_project, known_projects, register_project, write_json, read_json, check_safe_text, template_document, resolve_role, project_file)
+                     load_project, validate_project, known_projects, register_project, write_json, read_json, check_safe_text, validate_skills, template_document, resolve_role, project_file)
+from .skills import discover_skills
 from .runtime import (blocked_info, redact_record, start_team, launch_agent_process, terminal_name, role_labels, hc_ready,
                       existing_terminal, run_process, validate_binaries, which, stop_team, inbox_pending,
                       install_protocol, task_states, team_warnings, cleanup_report, _active, pending_owner_decisions, watch_once, STALE_MINUTES,
@@ -41,6 +42,9 @@ def add_parser() -> argparse.ArgumentParser:
     add.add_argument("--effort")
     add.add_argument("--replace", action="store_true", help="Explicitly replace existing profile")
     ps.add_parser("list")
+    sk = ps.add_parser("skills", help="List skills installed for profiles (folder names and SKILL.md name/description only)")
+    sk.add_argument("names", nargs="*", help="Profile aliases; default: all")
+    sk.add_argument("--json", action="store_true")
     det = ps.add_parser("detect", help="Find logged-in Claude/Codex config dirs and Antigravity (existence checks only; reads no file contents)")
     det.add_argument("--add", action="store_true", help="Register every detected, unregistered entry whose command is found")
     delete = ps.add_parser("remove")
@@ -56,6 +60,7 @@ def add_parser() -> argparse.ArgumentParser:
     setrole.add_argument("--effort")
     setrole.add_argument("--title", help="Job title fitted to the project, e.g. 'Senior AI Scientist'")
     setrole.add_argument("--focus", help="What this role concentrates on in this project")
+    setrole.add_argument("--skills", help="Comma-separated skill names for this role (see profile skills); empty string clears")
     routes = setrole.add_mutually_exclusive_group()
     routes.add_argument("--reviewer-role", help="Reviewer role for a worker (direct Worker → Reviewer reporting)")
     routes.add_argument("--clear-reviewer-role", action="store_true")
@@ -178,6 +183,8 @@ def profile_cmd(ns):
         return
     if ns.op == "detect":
         return detect_cmd(ns, profiles)
+    if ns.op == "skills":
+        return skills_cmd(ns, profiles)
     validate_id(ns.name, "profile name")
     if ns.op == "remove":
         if ns.name not in profiles:
@@ -191,6 +198,22 @@ def profile_cmd(ns):
     profiles[ns.name] = build_profile(ns.provider, ns.executable, ns.config_dir, ns.native_profile, ns.model, ns.effort)
     save_profiles(profiles)
     print(f"Saved local-only profile '{ns.name}' at {profiles_path()} (no tokens stored).")
+
+
+def skills_cmd(ns, profiles):
+    out = {}
+    for name in ns.names or sorted(profiles):
+        if name not in profiles:
+            raise OrgError(f"Unknown profile: {name}")
+        prof = profiles[name]
+        out[name] = {"provider": prof["provider"], "skills": discover_skills(prof["provider"], prof.get("config_dir"))}
+    if ns.json:
+        print(json.dumps(out, indent=2))
+        return
+    for name, item in out.items():
+        print(f"{name} ({item['provider']})")
+        for s in item["skills"]:
+            print(f"  {s['name']}  [{'built-in' if s['builtin'] else s['source']}]  {s['description']}")
 
 
 def build_profile(provider, executable, config_dir, native_profile, model, effort) -> dict:
@@ -316,6 +339,12 @@ def role_cmd(ns):
     if ns.profile:
         validate_id(ns.profile, "profile alias")
         role["profile"] = ns.profile
+    if ns.skills is not None:
+        skills = [x.strip() for x in ns.skills.split(",") if x.strip()]
+        validate_skills(skills, f"Role {ns.role}")
+        role["skills"] = skills
+        if not skills:
+            del role["skills"]
     if ns.model:
         role["model"] = ns.model
     if ns.effort:

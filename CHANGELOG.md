@@ -1,3 +1,14 @@
+## 1.1.0 - per-role skill sets chosen by the PM
+- New `agentorg profile skills [NAME...] [--json]`: skills installed for each profile (name, one-line description, source). Layouts per provider are in docs/ARCHITECTURE.md. Only skill folder names and SKILL.md `name`/`description` are read, plus plugin names and versions from Claude's `installed_plugins.json`; no credential or settings file is opened.
+- New optional role field `skills` (max 8 names, `plugin:skill` allowed) and `agentorg role set ROLE --skills a,b` (empty value clears). Old TEAM.json files stay valid.
+- `team plan` / `team up` warn, never fail, when a role skill is not installed for the role's profile (also in the report's `warnings` list).
+- A role's launch prompt gains one sentence naming its skills; nothing is added when it has none.
+- Bootstrap skill: the PM runs `profile skills` for the proposal's profiles, proposes 2-4 skills per role from that list in a new `Skills` column, and applies them with `role set --skills` after the owner's yes. The manager skill may propose skill changes at the post-milestone reassessment. Nothing is ever installed.
+- Panes are named `<Title> \· <provider>` with `herdr-app do pane.rename` after placement (best effort, a failure only warns). Equal row heights are still not handled (existing shortcut).
+- Plugin skill folders follow the plugin manifest's `skills` path (for example `.claude/skills`), else `<plugin>/skills/*`, plus a root SKILL.md.
+- Known limits: Codex and Antigravity plugin skills are listed by bare name; with no `installed_plugins.json` (Codex) the newest plugin version dir is used.
+- Mock-tested only (`tests/test_v11.py`): discovery over fake folder trees (the layouts were also read, names only, on one Windows machine with Claude Code, Codex and Antigravity installed), skills validation, the prompt sentence, the plan warning, and the `pane.rename` call. Not verified live: that `pane.rename` takes effect in a running Herdr App, that Codex and Antigravity honor the skill names in the prompt, and the bootstrap/manager skill wording with a real PM.
+
 ## 1.0.1 - Codex workers pick up their tasks
 - Fix (found live in Herdr App): Codex roles start with `-c disable_paste_burst=true`. `hc send` types fast, so Codex treated a dispatch as a paste and kept the Enter as a newline. The message sat unsent in the composer and the worker never started (seen twice as `unknown_delivery`). Verified live: without the flag the same message stayed in the composer, and with it Codex started work at once.
 - Fix (found live in Herdr App): `team watch --loop` crashed on Windows decoding `hc` output as cp1252. All subprocess output is now read as UTF-8 (`errors="replace"`).

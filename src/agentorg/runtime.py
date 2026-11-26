@@ -13,6 +13,7 @@ import shlex
 import time
 import uuid
 from pathlib import Path
+from .skills import discover_skills
 from .config import autonomy, check_safe_text, OrgError, read_json, write_json, org_home, register_project, load_project, load_profiles, resolve_profile, resolve_role
 
 
@@ -215,12 +216,30 @@ def role_launch_cmd(project: Path, role: dict, cwd: Path, session: str | None = 
     return command + ["--pm", pm] if pm else command
 
 
+def skill_warnings(doc: dict, profiles: dict) -> list:
+    """Role skills that discovery does not find for the role's profile. Warn only: skills are advice."""
+    cache, out = {}, []
+    for role in doc["roles"]:
+        prof = profiles.get(role["profile"])
+        if not role.get("enabled", True) or not role.get("skills") or not prof:
+            continue
+        if role["profile"] not in cache:
+            cache[role["profile"]] = {s["name"] for s in discover_skills(prof["provider"], prof.get("config_dir"))}
+        out += [f"Role {role['id']}: skill {s} not installed for profile {role['profile']}" for s in role["skills"] if s not in cache[role["profile"]]]
+    return out
+
+
 def start_team(project: Path, *, apply: bool = False, panes: bool = True, report: dict | None = None):
     doc = load_project(project)
     profiles = load_profiles()
     issues = validate_binaries(doc, profiles)
     if issues:
         raise OrgError("Cannot plan/start team:\n" + "\n".join("- " + x for x in issues))
+    warnings = skill_warnings(doc, profiles)
+    for w in warnings:
+        print("WARNING: " + w, file=sys.stderr)
+    if warnings and report is not None:
+        report["warnings"] = warnings
     workers = [r for r in doc["roles"] if r.get("enabled", True) and r["mode"] == "worker"]
     # Max parallel *work* is a PM task-allocation policy; idle role terminals are not active jobs.
     # It is never a hard cap: team status and the watcher only warn (see team_warnings).
@@ -290,6 +309,15 @@ def _herdr_do(*args):
     return r.stdout
 
 
+def _name_pane(pane: str, role: dict, profiles: dict):
+    """Label a pane "<Title> \u00b7 <provider>"; cosmetic, so a failure only warns."""
+    provider = profiles.get(role.get("profile"), {}).get("provider", role.get("profile", "agent"))
+    try:
+        _herdr_do("pane.rename", "--pane", pane, "--name", f"{role.get('title', role['id'])} \u00b7 {provider}")
+    except OrgError as exc:
+        print(f"WARNING: could not name pane for {role['id']} ({exc})", file=sys.stderr)
+
+
 def arrange_panes(project: Path, results: list, pm: str | None = None) -> dict:
     """Show the team as panes in the PM's tab: reviewers down a column, each one's workers to its right.
 
@@ -305,6 +333,7 @@ def arrange_panes(project: Path, results: list, pm: str | None = None) -> dict:
             return {"arranged": [], "skipped": "PM terminal has no pane"}
         pm_pane, pm_tab = snap[pm]
         roles = {r["id"]: r for r in load_project(project)["roles"]}
+        profiles = load_profiles()
         addr = {}
         for item in results:
             got = run_process(["hc", "get", item["terminal"], "--json"], timeout=15)
@@ -357,6 +386,7 @@ def arrange_panes(project: Path, results: list, pm: str | None = None) -> dict:
             else:
                 raise OrgError(f"pane for {rid} did not appear")
             arranged.append(rid)
+            _name_pane(snap[addr[rid]][0], roles[rid], profiles)
         return {"arranged": arranged}
     except (OrgError, ValueError, KeyError, AttributeError) as exc:
         print(f"WARNING: could not arrange panes ({exc}); the team still runs hidden.", file=sys.stderr)
@@ -748,8 +778,9 @@ def make_agent_prompt(project: Path, role: dict, pm: str | None = None) -> str:
                  "Never edit .ai/STATE.md. Do not wake PM for normal review rounds. "
                  + (f"Notify the PM with `hc send {pm} ESCALATION CODE TASK: .ai/inbox/FILE`. " if pm else
                     "PM is outside Herdr: do not send anything; the PM reads the inbox when it next wakes. "))
+    skills = f"Skills for this role (use them when they apply): {', '.join(role['skills'])}. " if role.get("skills") else ""
     return (f"You are {role.get('title', role['id'])} (role {role['id']}) in project {doc['project_id']}. "
-            f"Focus: {role.get('focus', '')}. "
+            f"Focus: {role.get('focus', '')}. " + skills +
             f"Read {protocol_path} before acting; it is authoritative for file layout, task states and escalations. "
             "Also read `hc --skill` and the project's .ai/PROJECT.md, .ai/TEAM.json, .ai/ROADMAP.md and .ai/STATE.md, if available. "
             "You are a team member, not the PM. Do not spawn other agents unless the PM explicitly delegates that authority. "

@@ -9,6 +9,8 @@ from importlib.resources import files
 from pathlib import Path
 
 ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
+SKILL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")  # ':' allows plugin-qualified names
+MAX_ROLE_SKILLS = 8
 PROVIDERS = {"claude", "codex", "antigravity"}
 ROLE_MODES = {"worker", "reviewer", "researcher", "observer"}
 AUTONOMY = ("full", "supervised")
@@ -87,6 +89,14 @@ def validate_id(value: str, label: str):
         raise OrgError(f"Invalid {label} '{value}'. Use lowercase a-z, digits, - or _; start with a letter; max 40 chars.")
 
 
+def validate_skills(value, label: str):
+    if not isinstance(value, list) or len(value) > MAX_ROLE_SKILLS or len(set(map(str, value))) != len(value):
+        raise OrgError(f"{label} skills must be a list of at most {MAX_ROLE_SKILLS} unique skill names")
+    for name in value:
+        if not isinstance(name, str) or not SKILL_RE.fullmatch(name):
+            raise OrgError(f"Invalid skill name '{name}' for {label}. Use letters, digits, - _ . and : (plugin:skill); max 64 chars.")
+
+
 def check_safe_text(value, label: str):
     """Reject text that cmd.exe would interpret when it reaches a .cmd shim argv."""
     if not isinstance(value, str) or any(c in value for c in '"%&|<>^') or any(ord(c) < 32 for c in value):
@@ -129,6 +139,8 @@ def validate_project(doc) -> dict:
         for opt in ("title", "focus", "model", "effort"):
             if opt in role:
                 check_safe_text(role[opt], f"Role {rid} {opt}")
+        if "skills" in role:
+            validate_skills(role["skills"], f"Role {rid}")
         for opt in ("model", "effort"):
             if opt in role and not role[opt].strip():
                 raise OrgError(f"Role {rid} optional {opt} must be a nonempty string")
