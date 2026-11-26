@@ -762,6 +762,10 @@ def _provider_env(provider: str, config_dir: str | None) -> dict:
     return env
 
 
+# --no-daemon: hc --skill, else commands run outside hc. No update check: on resume it is a menu that stalls an unattended agent (live).
+CODEX_FLAGS = ["--no-daemon", "-c", "check_for_update_on_startup=false"]
+
+
 def _resume_cmd(provider: str, command: str, flags: list, session: str, prompt: str | None = None) -> list[str]:
     """Reopen a provider conversation: an id, or "last" (most recent in the cwd) when none was recorded."""
     last = session == "last"
@@ -791,7 +795,7 @@ def launch_agent_process(project: Path, role_id: str, pm: str | None = None, ses
     env = _provider_env(provider, profile.get("config_dir"))
     model = role.get("model") or profile.get("model")
     effort = role.get("effort") or profile.get("effort")
-    flags = ["--no-daemon"] if provider == "codex" else []  # hc --skill: else commands run outside hc
+    flags = CODEX_FLAGS[:] if provider == "codex" else []
     if autonomy(doc) == "full":
         flags.append("--dangerously-bypass-approvals-and-sandbox" if provider == "codex" else "--dangerously-skip-permissions")
     if profile.get("native_profile"):
@@ -907,7 +911,9 @@ def resume_pm_process(project: Path):
     provider = pm.get("provider")
     if provider not in PROVIDER_COMMAND or not SESSION_RE.fullmatch(pm.get("session_id") or ""):
         raise OrgError("No registered PM session; run agentorg pm register inside the PM first.")
-    flags = ["--no-daemon"] if provider == "codex" else []
+    flags = CODEX_FLAGS[:] if provider == "codex" else []
+    if autonomy(load_project(project)) == "full":  # an unattended team must not leave its resumed PM at permission prompts
+        flags.append("--dangerously-bypass-approvals-and-sandbox" if provider == "codex" else "--dangerously-skip-permissions")
     if pm.get("model"):
         flags += ["-m" if provider == "codex" else "--model", pm["model"]]
     if pm.get("effort"):
