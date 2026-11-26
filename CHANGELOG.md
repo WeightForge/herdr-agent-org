@@ -1,5 +1,10 @@
 ## 1.0.1 - Codex workers pick up their tasks
 - Fix (found live in Herdr App): Codex roles start with `-c disable_paste_burst=true`. `hc send` types fast, so Codex treated a dispatch as a paste and kept the Enter as a newline. The message sat unsent in the composer and the worker never started (seen twice as `unknown_delivery`). Verified live: without the flag the same message stayed in the composer, and with it Codex started work at once.
+- Fix (found live in Herdr App): `team watch --loop` crashed on Windows decoding `hc` output as cp1252. All subprocess output is now read as UTF-8 (`errors="replace"`).
+- Fix (found live): `agentorg resume --apply` typed in the PM's own pane now resumes the PM. Before, that pane's foreground was `agentorg` itself, so the PM looked busy and got the wake text typed into a bare shell instead; a wake is now only typed into a terminal where an agent is idle or done.
+- Fix (found live): pane arrangement retries `terminal.keep` while herdr-app still reports a just-created terminal as not running; before, the resumed worker stayed hidden.
+- README demo is now a Herdr App screen recording (Claude Code PM on Haiku 5.5, Antigravity reviewer on Gemini 4 Hydrogen, Codex worker on GPT-6-Luna), sped up with captions; local paths are blurred.
+- Verified live in Herdr App after the fixes: resume from the PM pane brought back the Claude PM in its conversation and all three panes; the Codex worker picked up its packet without help.
 
 ## 1.0.0 - concurrency warnings, event wakes, cleanup, adaptive bootstrap
 All items are unit-tested with mocked `hc` and git state (`tests/test_v10.py`). The last two bullets list what was verified live and what was not.

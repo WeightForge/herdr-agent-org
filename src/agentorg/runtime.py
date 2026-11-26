@@ -23,7 +23,8 @@ ESCALATION_CODES = ("milestone_ready", "blocked", "requires_owner_decision", "sc
 
 def run_process(argv, *, cwd=None, timeout=25, env=None):
     try:
-        return subprocess.run(argv, cwd=str(cwd) if cwd else None, env=env, text=True,
+        # hc and git print UTF-8; the Windows default (cp1252) crashed team watch on agent status text (live).
+        return subprocess.run(argv, cwd=str(cwd) if cwd else None, env=env, text=True, encoding="utf-8", errors="replace",
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, check=False)
     except FileNotFoundError as exc:
         raise OrgError(f"Executable not found: {argv[0]}") from exc
@@ -336,7 +337,14 @@ def arrange_panes(project: Path, results: list, pm: str | None = None) -> dict:
             if anchor_addr not in snap:
                 break
             _herdr_do("pane.focus", "--pane", snap[anchor_addr][0])
-            reply = json.loads(_herdr_do("terminal.keep", "--terminal", addr[rid], "--place", place) or "{}")
+            for attempt in range(20):  # a just-(re)created terminal is briefly "not running" for herdr-app (live, resume)
+                try:
+                    reply = json.loads(_herdr_do("terminal.keep", "--terminal", addr[rid], "--place", place) or "{}")
+                    break
+                except OrgError as exc:
+                    if "no running terminal" not in str(exc) or attempt == 19:
+                        raise
+                    time.sleep(0.25)
             if reply.get("error") or reply.get("tab") != pm_tab:
                 # keep splits the FOCUSED pane; if that was not the PM's tab, undo and stop
                 _herdr_do("terminal.park", "--terminal", addr[rid])
@@ -1030,12 +1038,14 @@ def _resume_pm(project: Path, runtime: dict, team_changed: bool, apply: bool) ->
     if active is None:
         return {**item, "action": "pm_terminal_gone", "reason": "reopen the PM in Herdr App, then run agentorg pm register"}
     kind = lost_shell_kind(active)
+    if not kind and pm == pm_terminal() and _status(active) is None:
+        kind = shell_kind(active)  # run inside the PM pane: this agentorg is the shell's foreground (live)
     if kind and not rec.get("session_id"):
         return {**item, "action": "no_session", "reason": "PM session was never registered; reopen it by hand, then run agentorg pm register"}
     if kind:
         line = shell_line(kind, _entry_argv(project, "_resume_pm"))
         item.update(action="resume_in_shell", command=line)
-    elif team_changed and _status(active) not in ("working", "blocked"):
+    elif team_changed and _status(active) in ("idle", "done"):  # never type a wake into a terminal with no agent (live)
         line = PM_WAKE
         item.update(action="wake_pm", command=line)
     else:

@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import time
+import sys
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -240,3 +241,10 @@ class RegistryTest(Fixture):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RunProcessEncodingTest(unittest.TestCase):
+    def test_utf8_output_decodes_on_windows(self):
+        # live: team watch crashed decoding hc's UTF-8 status text with cp1252
+        out = runtime.run_process([sys.executable, "-c", "import sys; sys.stdout.buffer.write('\u2726 \u00e9 \u0e01'.encode('utf-8'))"])
+        self.assertEqual(out.stdout, "✦ é ก")
