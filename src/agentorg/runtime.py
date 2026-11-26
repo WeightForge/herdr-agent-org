@@ -421,6 +421,7 @@ def task_states(project: Path, stale_minutes: float = STALE_MINUTES, now: float 
     """Per-task state derived from .ai/tasks/*/ files only (see PROTOCOL.md). No stored state. full adds worker and paths."""
     now = time.time() if now is None else now
     base = project / ".ai" / "tasks"
+    roles = [r for r in read_json(project / ".ai" / "TEAM.json", default={}).get("roles", []) if r.get("mode") == "worker"]
     rows = {}
     for packet in sorted(base.glob("*/packet.md")):
         tid = packet.parent.name
@@ -429,7 +430,7 @@ def task_states(project: Path, stale_minutes: float = STALE_MINUTES, now: float 
         text = _read(packet)
         dep = _field(text, "blocked_by")
         reassign = _read(d / "reassign.md") if (d / "reassign.md").exists() else ""
-        worker = _field(reassign, "Worker") or _field(text, "Worker")  # a reassignment names the new worker
+        worker = _field(reassign, "Worker") or _field(text, "Worker") or _guess_worker(roles, text)  # a reassignment names the new worker
         paths = re.search(r"^Paths:[ \t]*(.+)$", text, re.M | re.I)
         rows[tid] = (d, progress, dep, worker, paths.group(1) if paths else "")
     result = []
@@ -460,6 +461,15 @@ def task_states(project: Path, stale_minutes: float = STALE_MINUTES, now: float 
             t["flags"].append("worker_busy")
         t["flags"] += [f"overlap:{o['id']}" for o in active if o is not t and _overlap(t["paths"], o["paths"])]
     return result if full else [{k: v for k, v in t.items() if k not in ("worker", "paths")} for t in result]  # status output keeps its old shape
+
+
+def _guess_worker(workers: list, packet: str) -> str | None:
+    """Packets written before the Worker field (live, 0.9 PM): the one worker named in the packet, else the one paired with its Reviewer."""
+    named = [r["id"] for r in workers if re.search(rf"(?<![\w-]){re.escape(r['id'])}(?![\w-])", packet)]
+    if len(named) != 1:
+        reviewer = _field(packet, "Reviewer")
+        named = [r["id"] for r in workers if reviewer and r.get("reviewer_role") == reviewer]
+    return named[0] if len(named) == 1 else None
 
 
 def _active(task: dict) -> bool:
@@ -622,7 +632,7 @@ def cleanup_report(project: Path, *, apply: bool = False) -> list[dict]:
                 except OrgError:
                     live = True  # cannot tell: never pull a worktree out from under a running agent
                 reason = (f"active task(s) use it: {', '.join(busy)}" if busy else "worker terminal is live; run team down first" if exists and live
-                          else "uncommitted changes" if dirty
+                          else "uncommitted or untracked files" if dirty
                           else "branch not merged" if has_branch and branch not in merged else None)
                 if reason:
                     info["reason"] = reason

@@ -139,6 +139,17 @@ class EventWakeTest(TaskMixin, Fixture):
         self.assertIn("more than one active task", sent[0][3])
 
 
+class GuessWorkerTest(TaskMixin, Fixture):
+    def test_packet_without_worker_field(self):
+        # live: a 0.9 PM wrote no Worker line, so cleanup could not map the task to a worktree
+        self.init()
+        self.task("a", extra="Scope / worktree+branch: D:\\wt\\backend-worker only\nReviewer: technical-reviewer\n")
+        self.task("b", extra="Reviewer: technical-reviewer\n")
+        self.task("c", extra="Reviewer: nobody\n")
+        workers = {t["id"]: t["worker"] for t in runtime.task_states(self.project, full=True)}
+        self.assertEqual(workers, {"a": "backend-worker", "b": "backend-worker", "c": None})
+
+
 class CleanupTest(TaskMixin, Fixture):
     def setUp(self):
         super().setUp()
@@ -170,7 +181,7 @@ class CleanupTest(TaskMixin, Fixture):
         self.task("t1", "done", worker="backend-worker")
         (self.loc / "scratch.txt").write_text("wip", encoding="utf-8")
         row = runtime.cleanup_report(self.project, apply=True)[0]
-        self.assertEqual((row["action"], row["reason"]), ("kept", "uncommitted changes"))
+        self.assertEqual((row["action"], row["reason"]), ("kept", "uncommitted or untracked files"))
         self.assertTrue(self.loc.exists())
         subprocess.run([*GIT, "add", "scratch.txt"], cwd=self.loc, check=True)
         subprocess.run([*GIT, "commit", "-qm", "wip"], cwd=self.loc, check=True)
