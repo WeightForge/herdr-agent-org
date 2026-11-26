@@ -12,3 +12,6 @@ build/
 .env
 .env.*
 !.env.example
+
+# Marketing media (videos, raw recordings): local only
+docs/marketing/
