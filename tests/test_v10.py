@@ -147,6 +147,9 @@ class CleanupTest(TaskMixin, Fixture):
         self.role = config.resolve_role(doc, "backend-worker")
         self.loc = runtime.ensure_worktree(self.project, self.role)
         self.branch = runtime.worktree_info(self.project, self.role)[1]
+        live = patch("agentorg.runtime.existing_terminal", return_value=None)
+        self.live = live.start()
+        self.addCleanup(live.stop)
 
     def branches(self):
         return subprocess.run(["git", "branch", "--format=%(refname:short)"], cwd=self.project, text=True, capture_output=True).stdout.split()
@@ -177,6 +180,13 @@ class CleanupTest(TaskMixin, Fixture):
         row = runtime.cleanup_report(self.project, apply=True)[0]
         self.assertEqual(row["action"], "kept")
         self.assertIn("t2", row["reason"])
+        self.assertTrue(self.loc.exists())
+
+    def test_live_worker_terminal_is_kept(self):
+        self.task("t1", "done", worker="backend-worker")
+        self.live.return_value = {"name": "worker"}
+        row = runtime.cleanup_report(self.project, apply=True)[0]
+        self.assertEqual((row["action"], row["reason"]), ("kept", "worker terminal is live; run team down first"))
         self.assertTrue(self.loc.exists())
 
     def test_unknown_worker_is_kept(self):

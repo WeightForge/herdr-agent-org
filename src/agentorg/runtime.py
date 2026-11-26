@@ -604,7 +604,12 @@ def cleanup_report(project: Path, *, apply: bool = False) -> list[dict]:
                 has_branch = run_process(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], cwd=project).returncode == 0
                 info = {"worker": w, "worktree": str(loc) if exists else None, "branch": branch if has_branch else None,
                         "merged": branch in merged, "dirty": dirty, "action": "kept"}
-                reason = (f"active task(s) use it: {', '.join(busy)}" if busy else "uncommitted changes" if dirty
+                try:
+                    live = existing_terminal(terminal_name(project, w), role_labels(project, role)) is not None
+                except OrgError:
+                    live = True  # cannot tell: never pull a worktree out from under a running agent
+                reason = (f"active task(s) use it: {', '.join(busy)}" if busy else "worker terminal is live; run team down first" if exists and live
+                          else "uncommitted changes" if dirty
                           else "branch not merged" if has_branch and branch not in merged else None)
                 if reason:
                     info["reason"] = reason

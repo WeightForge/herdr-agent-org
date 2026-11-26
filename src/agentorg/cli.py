@@ -150,7 +150,7 @@ def init_project(ns):
         ".ai/ROADMAP.md": "# Capability milestones (no dates required)\n\n## M0 — Foundations\n- [ ] Identify critical assumptions, tests, and dependencies\n\n## Next\n- [ ] Define first meaningful deliverable and acceptance criteria\n",
         ".ai/STATE.md": "# Project checkpoint\n\n## Current milestone\nM0 — Foundations\n\n## Active tasks\nNone yet.\n\n## Open PRs/artifacts\nNone yet.\n\n## Blockers\nNone yet.\n\n## Handled escalations\nNone yet. The PM appends inbox ids here before moving files to inbox/done/.\n\n## Next action\nReview project scope and assign first scoped task.\n",
         ".ai/DECISIONS.md": "# Decisions\n\nRecord context, options, chosen action, evidence, and reversible/irreversible impacts.\n",
-        "QUESTION.md": "# Questions for the human owner\n\nRecord only decisions requiring human approval, with options, recommendation and safe work while awaiting answer.\n",
+        "QUESTION.md": "# Questions for the human owner\n\nRecord only decisions requiring human approval, with options, recommendation and safe work while awaiting answer.\nOwner: write your answer after the `Answer:` line under each question.\n",
         ".ai/.gitignore": "RUNTIME.json\ninbox/\n",
     }
     created, skipped = [], []
