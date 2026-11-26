@@ -178,3 +178,22 @@ class PaneNameTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ManifestSkillPathTest(unittest.TestCase):
+    def test_plugin_manifest_skills_path_is_followed(self):
+        # live: ui-ux-pro-max declares "skills": "./.claude/skills/" and was missed
+        import tempfile
+        from agentorg.skills import discover_skills
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / ".claude" / "plugins" / "cache" / "m" / "uiux" / "2.0"
+            (root / ".claude-plugin").mkdir(parents=True)
+            (root / ".claude-plugin" / "plugin.json").write_text('{"skills": "./.claude/skills/"}', encoding="utf-8")
+            s = root / ".claude" / "skills" / "design-system"
+            s.mkdir(parents=True)
+            (s / "SKILL.md").write_text("---\nname: design-system\ndescription: Tokens.\n---\n", encoding="utf-8")
+            (root / ".claude-plugin" / "evil").mkdir()
+            names = [x["name"] for x in discover_skills("claude", home=tmp)]
+            self.assertIn("uiux:design-system", names)
+            (root / ".claude-plugin" / "plugin.json").write_text('{"skills": "../../../../../../outside"}', encoding="utf-8")
+            self.assertNotIn("uiux:design-system", [x["name"] for x in discover_skills("claude", home=tmp)])

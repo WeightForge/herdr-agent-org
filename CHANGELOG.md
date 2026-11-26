@@ -5,7 +5,8 @@
 - A role's launch prompt gains one sentence naming its skills; nothing is added when it has none.
 - Bootstrap skill: the PM runs `profile skills` for the proposal's profiles, proposes 2-4 skills per role from that list in a new `Skills` column, and applies them with `role set --skills` after the owner's yes. The manager skill may propose skill changes at the post-milestone reassessment. Nothing is ever installed.
 - Panes are named `<Title> \· <provider>` with `herdr-app do pane.rename` after placement (best effort, a failure only warns). Equal row heights are still not handled (existing shortcut).
-- Known limits: plugin skills are found only under `<plugin>/skills/*` and a root SKILL.md (custom skill paths in plugin manifests are not followed); Codex and Antigravity plugin skills are listed by bare name; with no `installed_plugins.json` (Codex) the newest plugin version dir is used.
+- Plugin skill folders follow the plugin manifest's `skills` path (for example `.claude/skills`), else `<plugin>/skills/*`, plus a root SKILL.md.
+- Known limits: Codex and Antigravity plugin skills are listed by bare name; with no `installed_plugins.json` (Codex) the newest plugin version dir is used.
 - Mock-tested only (`tests/test_v11.py`): discovery over fake folder trees (the layouts were also read, names only, on one Windows machine with Claude Code, Codex and Antigravity installed), skills validation, the prompt sentence, the plan warning, and the `pane.rename` call. Not verified live: that `pane.rename` takes effect in a running Herdr App, that Codex and Antigravity honor the skill names in the prompt, and the bootstrap/manager skill wording with a real PM.
 
 ## 1.0.1 - Codex workers pick up their tasks

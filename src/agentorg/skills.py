@@ -2,7 +2,8 @@
 
 Only skill folder names and the `name` / `description` frontmatter of each SKILL.md are read.
 Nothing else under a provider config dir (auth, settings, tokens) is ever opened; the one
-other file read is Claude's installed_plugins.json, for plugin names and versions only.
+other files read are Claude's installed_plugins.json (plugin names and versions) and each plugin's
+plugin.json manifest (its `skills` path only).
 """
 from __future__ import annotations
 
@@ -68,6 +69,28 @@ def _installed_versions(path: Path) -> dict:
         return {}
 
 
+def _manifest_skill_dirs(root: Path) -> list:
+    """Skill folders a plugin declares in its manifest (`"skills": "./.claude/skills/"`, a string or list), else `skills/`.
+
+    Live: ui-ux-pro-max keeps its skills under `.claude/skills`. Paths outside the plugin folder are ignored.
+    """
+    for manifest in (root / ".claude-plugin" / "plugin.json", root / ".codex-plugin" / "plugin.json"):
+        try:
+            declared = json.loads(manifest.read_text(encoding="utf-8-sig")).get("skills")
+        except (OSError, ValueError, AttributeError):
+            continue
+        paths = [declared] if isinstance(declared, str) else declared if isinstance(declared, list) else []
+        dirs = []
+        for p in paths:
+            if isinstance(p, str):
+                d = (root / p).resolve()
+                if d.is_relative_to(root.resolve()):
+                    dirs.append(d)
+        if dirs:
+            return dirs
+    return [root / "skills"]
+
+
 def _plugin_skills(base: Path, qualify: bool, installed: dict) -> list:
     """Skills of the installed version of each plugin under `<base>/plugins/cache/<marketplace>/<plugin>/<version>`."""
     out = []
@@ -81,8 +104,8 @@ def _plugin_skills(base: Path, qualify: bool, installed: dict) -> list:
             if root is None:
                 continue
             prefix = plugin.name + ":" if qualify else ""
-            # shortcut: only <plugin>/skills/* and a root SKILL.md; custom skill paths in plugin manifests are not followed
-            out += _skills_in(root / "skills", plugin.name, prefix)
+            for folder in _manifest_skill_dirs(root):
+                out += _skills_in(folder, plugin.name, prefix)
             if (root / "SKILL.md").is_file():
                 out.append(_item(root / "SKILL.md", plugin.name, plugin.name, prefix))
     return out
