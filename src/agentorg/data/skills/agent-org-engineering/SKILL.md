@@ -7,8 +7,8 @@ description: Reviewer-led multi-agent software engineering loop using Herdr and 
 
 ## Running the CLI
 
-Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `0.9.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.9.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==0.9.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
-<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==0.9.0`. tests/test_plugins.py checks the pin against __version__. -->
+Every `agentorg ...` command in this skill means the CLI resolved as follows. Resolve once per session: use `agentorg` only if `agentorg --version` prints exactly `1.0.0`, the version of this skill; for any other version or if the command is missing, run `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v1.0.0 agentorg` in its place (no install step; needs `uv`). Pass the same arguments either way. If neither works, ask the user to install `uv` or `pip install herdr-agent-org==1.0.0`. This keeps the CLI on the same version as this skill, so an older installed `agentorg` is never used.
+<!-- Release note: once herdr-agent-org is on PyPI the fallback may become `uvx herdr-agent-org==1.0.0`. tests/test_plugins.py checks the pin against __version__. -->
 
 Use existing repository build/test/security/contribution instructions as source of truth. A good engineering loop minimizes PM calls, noisy PRs, duplicated agents and branch conflicts.
 
@@ -24,11 +24,14 @@ Scope / worktree+branch: <owned files, branch>
 Acceptance criteria: <measurable>
 Expected tests: <commands>
 Reviewer: <role> (terminal <name>)
+Worker: <role id>                  (optional)
+Paths: <comma-separated repo paths or globs this task writes>   (optional)
+Test command: <exact command>     (optional)
 blocked_by: <task id or none>
 Exit conditions / permission gates: <...>
 ```
 
-One write owner per worktree. Workers may run tasks in parallel only if interfaces and files do not conflict.
+One write owner per worktree. Workers may run tasks in parallel only if interfaces and files do not conflict; `Paths` lets `agentorg team status` warn about overlap and about a worker holding more than one active task.
 
 ## Worker-owned implementation loop
 
@@ -46,7 +49,7 @@ One write owner per worktree. Workers may run tasks in parallel only if interfac
 The reviewer is the Herdr parent of its paired workers, so hc notes about them (turn ended, blocked, exited) arrive at the reviewer, who handles them and escalates to the PM address in its launch prompt.
 
 1. On a packet path: create `progress.md` with `State: acknowledged`; a repeated path for a known task id is not a new task. Move the state on as the protocol table says (`started` after the worker's `ACK`, `in_review` on a handoff reference, then `done` or `blocked`). Release dependent tasks once the prerequisite is `done`.
-2. Independently review the actual diff, tests, security, regressions, specifications and user experience; validate reported tests/CI instead of trusting claims.
+2. Start from the worker's commit diff and test evidence (run the packet's `Test command` if given), then widen. Independently review the actual diff, tests, security, regressions, specifications and user experience; validate reported tests/CI instead of trusting claims.
 3. Send actionable findings **directly to the worker** with severity, location, expected correction and reproduction. Do not ask the PM to relay comments.
 4. Count consecutive UNPRODUCTIVE rounds in `progress.md`. At `policies.review_rounds_before_rca` (default 3) stop patch churn; require root-cause analysis, minimal reproduction and a regression test. Reviewer may take over implementation only exceptionally, after recording ownership change and arranging a second independent verifier.
 5. When validation passes and gates are met, escalate one `milestone_ready` (a review-ready PR is not permission to merge). Escalate immediately only with `blocked`, `scope_change`, `safety_or_cost_risk`, `requires_owner_decision` or `review_exhausted`. File format and delivery: protocol.

@@ -34,12 +34,15 @@ One giant PM prompt that dispatches, polls, relays review comments and remembers
 ## Features
 
 - One-question setup: the PM reads your repo and proposes a team with real job titles, accounts, models and effort; one "yes" starts it.
-- Full autonomy: agents work without permission prompts inside the project, park owner decisions in `QUESTION.md` and keep going; `team watch` wakes the PM when work stalls.
+- Full autonomy: agents work without permission prompts inside the project, park owner decisions in `QUESTION.md` and keep going; `team watch` wakes the PM when work stalls, when a new escalation lands in the inbox, and when you answer in `QUESTION.md`.
 - `agentorg resume`: after a restart every agent comes back in its own Herdr pane with its own conversation.
 - Dry-run by default; nothing starts without `team up --apply`.
 - One Git worktree and branch per software worker.
 - Path-only dispatch: agents get a file path, never pasted task text.
 - Task lifecycle derived from files (`dispatched` to `done`), printed by `team status`, with the next actor named.
+- Concurrency warnings, never blocks: optional `Worker` and `Paths` packet fields let `team status` and the watcher warn about a busy worker, overlapping paths and more active tasks than `max_parallel_workers`.
+- `agentorg team cleanup [--apply]`: report (dry run) or remove clean, merged worktrees and branches of finished tasks.
+- An adaptive team: the bootstrap proposal says why each role exists and what can run in parallel; the PM reassesses team size after each milestone and proposes changes to you.
 - Six escalation codes, written to `.ai/inbox/`, so nothing depends on a message arriving.
 - Local-only provider profiles for `claude`, `codex` and `antigravity`; no credentials stored, no account fallback.
 - `team up --apply` from a Herdr App terminal shows the team as panes in your current tab (reviewers in a column, their workers to the right); `--no-panes` opts out.
@@ -116,7 +119,7 @@ pip install herdr-agent-org
 agentorg install --target both        # skills for Claude Code and Codex (also: claude | codex | antigravity | all)
 ```
 
-Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v0.9.0 agentorg`.
+Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v1.0.0 agentorg`.
 
 Profiles are local aliases: an executable, an optional config directory (`--config-dir`, e.g. a separate `CLAUDE_CONFIG_DIR`) and a public model/effort. No key is stored. The CLI must already be installed and logged in.
 
@@ -168,7 +171,7 @@ New projects have `"autonomy": "full"` in `.ai/TEAM.json` (a project without the
 - Agents launch without permission prompts (`--dangerously-skip-permissions` for Claude and Antigravity, `--dangerously-bypass-approvals-and-sandbox` for Codex). That is not a sandbox; see [`SECURITY.md`](https://github.com/WeightForge/herdr-agent-org/blob/main/SECURITY.md).
 - Inside the project and its worktrees they edit, test, commit, push team branches and open PRs. The PM and reviewers can answer a teammate's trust prompt with `hc keys`.
 - Decisions that need you go to `QUESTION.md` (options and a recommended answer) while the rest of the team keeps working. Hard lines always wait for you: anything outside the project or on the system, force-push to the default branch, spending money, sending secrets off the machine, and merge, release or deploy.
-- `agentorg team watch --loop` wakes the PM when tasks go stale or every role is idle with open tasks. `team status` flags stale tasks.
+- `agentorg team watch --loop` wakes the PM when tasks go stale or every role is idle with open tasks, when a new `.ai/inbox` escalation appears, and when you answer in `QUESTION.md` (write a line `Answer: ...` under the question; the PM changes it to `Answered:` once handled). Each event wakes once, even across watcher restarts. `team status` flags stale tasks and lists `warnings`; `max_parallel_workers` is warned about, not hard-capped.
 
 Set `"autonomy": "supervised"` in `.ai/TEAM.json` for the earlier behavior: you approve every prompt.
 
@@ -258,8 +261,9 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 | `agentorg team plan` | Dry run: exact launch argv and worktree paths |
 | `agentorg team up [--apply]` | Start or reuse terminals and create worktrees (only with `--apply`) |
 | `agentorg team send ROLE MESSAGE [--wait]` | `hc send` to a live role; use it for packet paths |
-| `agentorg team status` | Per-task state, inbox count, blocked terminals, owner decisions, live roles |
-| `agentorg team watch [--loop] [--interval N] [--stale-minutes M]` | One watchdog check (or a loop): `hc send` a wake-up to the PM (only when it is idle or done) when open tasks are stale or no role is working |
+| `agentorg team status` | Per-task state, inbox count, blocked terminals, owner decisions, warnings, the watcher's last wake, live roles |
+| `agentorg team cleanup [--apply]` | Worktree, branch, merged and dirty state of finished tasks; with `--apply` remove only clean worktrees and `git branch -d` merged branches |
+| `agentorg team watch [--loop] [--interval N] [--stale-minutes M]` | One watchdog check (or a loop): `hc send` a wake-up to the PM (only when it is idle or done) when open tasks are stale or no role is working, a new inbox escalation exists, or `QUESTION.md` has an answer |
 | `agentorg resume [--all] [--apply]` | After a restart: reopen each agent in its original pane and conversation (dry run without `--apply`) |
 | `agentorg pm register [--model M] [--effort E]` | Run by the PM: record its own provider session, terminal, model and effort for `resume` |
 | `agentorg team reconcile` | Same as `status`, and refresh the untracked `.ai/RUNTIME.json` |
@@ -306,10 +310,8 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 
 ## Roadmap
 
-- Wake the PM when the owner answers `QUESTION.md` while every task is parked (today you tell the PM).
 - Live-verify Claude and Codex resume and a real Windows reboot.
 - More live testing across Windows, Linux and Herdr versions.
-- Enforce `max_parallel_workers` (currently PM policy, not a process cap).
 - CI/PR adapters and mature research/content templates.
 
 ## Contributing
