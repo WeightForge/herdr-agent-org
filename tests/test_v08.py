@@ -57,7 +57,7 @@ class AutonomyTest(Fixture):
                 cmd = seen["cmd"]
                 self.assertEqual(cmd[0], "/mock/" + command)
                 if mode == "full":
-                    self.assertEqual(cmd[1] if provider != "codex" else cmd[4], flags[provider], (provider, cmd[:5]))
+                    self.assertEqual(cmd[1] if provider != "codex" else cmd[6], flags[provider], (provider, cmd[:7]))
                     self.assertEqual(sum(a.startswith("--dangerously") for a in cmd), 1)
                 else:
                     self.assertFalse(any(a.startswith("--dangerously") for a in cmd), (provider, cmd[:4]))

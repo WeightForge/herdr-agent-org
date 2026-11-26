@@ -124,7 +124,7 @@ pip install herdr-agent-org
 agentorg install --target both        # skills for Claude Code and Codex (also: claude | codex | antigravity | all)
 ```
 
-Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v1.0.0 agentorg`.
+Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v1.0.1 agentorg`.
 
 Profiles are local aliases: an executable, an optional config directory (`--config-dir`, e.g. a separate `CLAUDE_CONFIG_DIR`) and a public model/effort. No key is stored. The CLI must already be installed and logged in.
 
