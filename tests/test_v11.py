@@ -2,6 +2,7 @@
 import contextlib
 import io
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -197,3 +198,33 @@ class ManifestSkillPathTest(unittest.TestCase):
             self.assertIn("uiux:design-system", names)
             (root / ".claude-plugin" / "plugin.json").write_text('{"skills": "../../../../../../outside"}', encoding="utf-8")
             self.assertNotIn("uiux:design-system", [x["name"] for x in discover_skills("claude", home=tmp)])
+
+
+class TrustPromptTest(unittest.TestCase):
+    def test_answers_each_provider_prompt_once_then_waits_for_ready(self):
+        # live: a dispatch typed into Codex's trust prompt opened its Agent Command Center and forked an old session
+        screens = {"cx": ["loading", "Trust this folder?\n1. Trust and continue", "Ask Codex to do anything"],
+                   "ag": ["Do you trust the contents of this project?", "Running..."],
+                   "cl": ["Yes, I trust this folder", "bypass permissions on"],
+                   "ready": ["Ask Codex to do anything"]}
+        sent = []
+
+        def proc(argv, **kw):
+            if argv[1] == "read":
+                seq = screens[argv[2]]
+                out = seq.pop(0) if len(seq) > 1 else seq[0]
+                return subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")
+            sent.append(argv[2:])
+            return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+        with patch("agentorg.runtime.run_process", side_effect=proc), patch("agentorg.runtime.time.sleep"):
+            left = runtime.accept_trust_prompts([("cx", "codex"), ("ag", "antigravity"), ("cl", "claude"), ("ready", "codex")], timeout=30)
+        self.assertEqual(left, [])
+        self.assertEqual(sorted(sent), [["ag", "enter"], ["cl", "down", "enter"], ["cx", "enter"]])
+
+    def test_timeout_warns_and_returns_stuck_terminals(self):
+        proc = lambda argv, **kw: subprocess.CompletedProcess(argv, 0, stdout="still loading", stderr="")
+        err = io.StringIO()
+        with patch("agentorg.runtime.run_process", side_effect=proc), patch("agentorg.runtime.time.sleep"), \
+             patch("agentorg.runtime.time.time", side_effect=[0, 0, 100, 100]), contextlib.redirect_stderr(err):
+            self.assertEqual(runtime.accept_trust_prompts([("cx", "codex")], timeout=5), ["cx"])
+        self.assertIn("WARNING", err.getvalue())

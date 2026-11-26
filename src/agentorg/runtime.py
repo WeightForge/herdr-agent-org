@@ -277,15 +277,51 @@ def start_team(project: Path, *, apply: bool = False, panes: bool = True, report
                 # 124 may be an hc check-in timeout: do not relaunch; inspect its terminal.
                 item["action"] = "launched" if spawned.returncode == 0 else "verify-terminal"
                 item["output"] = (spawned.stdout or "")[-400:]
+            item["provider"] = provider
             entry = runtime.setdefault("terminals", {}).setdefault(role["id"], {})
             entry.update({"name": name, "cwd": str(cwd), "status": item["action"], "provider": provider, "profile": role["profile"]})
             if item["action"] != "reused":  # a reused terminal keeps the session it already runs
                 entry.update({"session_id": session, "launched_at": time.time()})
             write_json(project / ".ai" / "RUNTIME.json", runtime)
         result.append(item)
+    if apply and autonomy(doc) == "full":
+        accept_trust_prompts([(i["terminal"], i["provider"]) for i in result if i["action"] == "launched"])
     if apply and report is not None:
         report["panes"] = arrange_panes(project, result) if panes else {"arranged": [], "skipped": "--no-panes"}
     return result
+
+
+# provider: (text that marks its folder-trust prompt, keys that accept it, text that marks a ready composer)
+TRUST_PROMPTS = {
+    "codex": ("Trust this folder?", ["enter"], "Ask Codex to do anything"),  # 1. Trust and continue is preselected
+    "antigravity": ("Do you trust the contents of this project?", ["enter"], "? for shortcuts"),  # Yes is preselected
+    "claude": ("Yes, I trust this folder", ["down", "enter"], "bypass permissions"),  # "No, exit" is preselected
+}
+
+
+def accept_trust_prompts(terminals: list, timeout: float = 60) -> list:
+    """Answer each new agent's folder-trust prompt before anyone can message it (full autonomy, owner approved).
+
+    Live: a PM dispatch typed while Codex still showed its trust prompt was read as menu keys; it opened the
+    Agent Command Center and forked an unrelated old session. So team up answers the prompt itself and waits
+    until every launched agent shows its ready composer. Returns the terminals still not ready (warned).
+    """
+    pending = {name: provider for name, provider in terminals if provider in TRUST_PROMPTS}
+    answered, deadline = set(), time.time() + timeout
+    while pending and time.time() < deadline:
+        for name, provider in list(pending.items()):
+            marker, keys, ready = TRUST_PROMPTS[provider]
+            screen = run_process(["hc", "read", name], timeout=15).stdout or ""
+            if marker in screen:
+                run_process(["hc", "keys", name, *keys], timeout=15)
+                answered.add(name)
+            elif name in answered or ready in screen:  # prompt gone after our answer, or never shown
+                del pending[name]
+        if pending:
+            time.sleep(1)
+    for name in pending:
+        print(f"WARNING: {name} did not reach its ready prompt in {timeout:.0f}s; check it before dispatching (hc read {name}).", file=sys.stderr)
+    return list(pending)
 
 
 def _ls_panes() -> dict:
