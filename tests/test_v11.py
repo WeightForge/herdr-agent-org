@@ -203,7 +203,7 @@ class ManifestSkillPathTest(unittest.TestCase):
 class TrustPromptTest(unittest.TestCase):
     def test_answers_each_provider_prompt_once_then_waits_for_ready(self):
         # live: a dispatch typed into Codex's trust prompt opened its Agent Command Center and forked an old session
-        screens = {"cx": ["loading", "Trust this folder?\n1. Trust and continue", "Ask Codex to do anything"],
+        screens = {"cx": ["loading", "Trust this folder?\n1. Trust and continue", "Trust this folder?", "Ask Codex to do anything"],
                    "ag": ["Do you trust the contents of this project?", "Running..."],
                    "cl": ["Yes, I trust this folder", "bypass permissions on"],
                    "ready": ["Ask Codex to do anything"]}

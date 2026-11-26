@@ -313,8 +313,9 @@ def accept_trust_prompts(terminals: list, timeout: float = 60) -> list:
             marker, keys, ready = TRUST_PROMPTS[provider]
             screen = run_process(["hc", "read", name], timeout=15).stdout or ""
             if marker in screen:
-                run_process(["hc", "keys", name, *keys], timeout=15)
-                answered.add(name)
+                if name not in answered:  # once only: a second Enter in Codex's next screen opens another thread (live)
+                    run_process(["hc", "keys", name, *keys], timeout=15)
+                    answered.add(name)
             elif name in answered or ready in screen:  # prompt gone after our answer, or never shown
                 del pending[name]
         if pending:
