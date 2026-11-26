@@ -17,7 +17,7 @@ Start the team, go to sleep, and come back to finished work, a short list of que
 
 <img src="https://raw.githubusercontent.com/WeightForge/herdr-agent-org/main/assets/demo.gif" alt="Demo: a Claude Code PM sets up a team, a Codex worker implements, an Antigravity reviewer verifies, the owner answers in QUESTION.md, and after every terminal is removed agentorg resume brings each agent back to its own conversation" width="100%">
 
-<sub>A live run of real agents (Claude Code PM on Haiku 5.5, Antigravity reviewer on Gemini 4 Hydrogen, Codex worker on GPT-6-Luna) on a sample repo, re-drawn from their terminal text and sped up. A Herdr App screen recording will replace it.</sub>
+<sub>Recorded in Herdr App, sped up, with captions: a Claude Code PM (Haiku 5.5), an Antigravity reviewer (Gemini 4 Hydrogen) and a Codex worker (GPT-6-Luna) on a sample repo. Local paths are blurred.</sub>
 
 </div>
 

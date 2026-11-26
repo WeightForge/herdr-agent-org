@@ -60,6 +60,21 @@ class PanesTest(unittest.TestCase):
             ["do", "pane.focus", "--pane", "pt2"], ["do", "terminal.keep", "--terminal", "t4", "--place", "right"],
             ["do", "pane.focus", "--pane", "ptPM"]])
 
+    def test_keep_retries_while_terminal_is_not_running_yet(self):
+        # live (resume): herdr-app answered "no running terminal" for a terminal created a moment earlier
+        fake, fails = FakeHerdr(), {"t3": 2}
+
+        def flaky(argv, **kw):
+            if argv[0] != "hc" and len(argv) > 4 and argv[2] == "terminal.keep" and fails.get(argv[4], 0) > 0:
+                fails[argv[4]] -= 1
+                fake.calls.append(argv[1:])
+                return subprocess.CompletedProcess(argv, 1, stdout="", stderr='{"error": "no running terminal \\"t3\\""}')
+            return fake(argv, **kw)
+        out, err = self.run_arrange(flaky)
+        self.assertEqual(out, {"arranged": ["r1", "r2", "w1", "w2"]})
+        self.assertEqual(len([c for c in fake.mutations() if c[1] == "terminal.keep" and c[3] == "t3"]), 3)
+        self.assertEqual(err, "")
+
     def test_wrong_tab_parks_and_stops(self):
         fake = FakeHerdr(keep_tab="other")
         out, err = self.run_arrange(fake)

@@ -121,6 +121,21 @@ class ResumeTest(Fixture):
         for ch in '"%&|<>^':  # the wake text may reach a Windows .cmd shim
             self.assertNotIn(ch, runtime.PM_WAKE)
 
+    def test_resume_run_inside_the_pm_pane_resumes_the_pm(self):
+        # live: `agentorg resume` typed in the PM pane is that shell's foreground, so the pane did not look idle
+        extra = {"pm_terminal": "t9", "pm": {"provider": "claude", "session_id": UUID}}
+        terminals = {n: shell() for n in self.names()}
+        terminals["t9"] = {"name": "t9", "state": "live", "argv": ["powershell.exe", "-NoExit"], "status": None,
+                           "foreground": {"name": "agentorg.exe", "argv": ["agentorg.exe", "resume", "--apply"]}}
+        with patch.dict(os.environ, {"HC_TERMINAL_ID": "t9"}):
+            items, _ = self.run_resume(terminals, runtime_extra=extra)
+        self.assertEqual(items[-1]["action"], "resume_in_shell")
+        self.sent.clear()
+        with patch.dict(os.environ, {"HC_TERMINAL_ID": "t3"}):  # elsewhere: something else runs there, no agent, leave it
+            items, _ = self.run_resume(terminals, runtime_extra=extra)
+        self.assertEqual(items[-1]["action"], "running")
+        self.assertEqual([s for s in self.sent if s[:3] == ["hc", "send", "t9"]], [])
+
     def test_unregistered_pm_in_shell_is_reported(self):
         items, _ = self.run_resume({"t9": shell()}, runtime_extra={"pm_terminal": "t9"})
         self.assertEqual(items[-1]["action"], "no_session")
