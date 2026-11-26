@@ -258,16 +258,17 @@ def start_team(project: Path, *, apply: bool = False, panes: bool = True, report
     # Reviewers first (stable otherwise): they must exist before their workers name them as parent.
     ordered = sorted((r for r in doc["roles"] if r.get("enabled", True)), key=lambda r: r["mode"] != "reviewer")
     for role in ordered:
+        name = terminal_name(project, role["id"])
+        active = existing_terminal(name, role_labels(project, role)) if apply else None
         cwd = project
         if doc["kind"] == "software" and role["mode"] == "worker" and doc.get("policies", {}).get("isolate_worker_worktrees", True):
-            cwd = ensure_worktree(project, role) if apply else worktree_info(project, role)[0]
+            # a running worker may have switched branches in its own worktree; only a new launch checks it (live)
+            cwd = ensure_worktree(project, role) if apply and active is None else worktree_info(project, role)[0]
         provider = resolve_profile(role, profiles)["provider"]
         session = str(uuid.uuid4()) if provider == "claude" else None
         cmd = role_launch_cmd(project, role, cwd, session=session)
-        name = terminal_name(project, role["id"])
         item = {"role": role["id"], "terminal": name, "cwd": str(cwd), "command": cmd, "action": "preview"}
         if apply:
-            active = existing_terminal(name, role_labels(project, role))
             if active is not None:
                 item["action"] = "reused"
             else:
