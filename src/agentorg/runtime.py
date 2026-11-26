@@ -508,23 +508,36 @@ def _working(record) -> bool:
     return _status(record) == "working"
 
 
-ANSWER_RE = re.compile(r"^\s*(?:[-*]\s*)?\**Answer\**:\**[ \t]*\S", re.M | re.I)  # the PM turns a handled one into "Answered:"
+ANSWER_RE = re.compile(r"^\s*(?:[-*]\s*)?\**Answer\**:\**[ \t]*\S", re.I)  # "Answered:" (handled) does not match
 
 
 def _question_files(project: Path) -> list[Path]:
     return [f for f in (project / "QUESTION.md", project / ".ai" / "QUESTION.md") if f.is_file()]
 
 
-def _watch_events(project: Path, runtime: dict) -> tuple[list[str], list[str], float]:
-    """New wake events as (messages, inbox ids, QUESTION.md mtime to remember): escalations not handled or announced, an owner answer."""
+def _answers(project: Path) -> list[str]:
+    """One key per owner answer line, tied to the question heading above it, so two questions answered alike stay distinct."""
+    keys = []
+    for f in _question_files(project):
+        heading = ""
+        for line in _read(f).splitlines():
+            if line.startswith("#"):
+                heading = line.strip()
+            elif ANSWER_RE.match(line):
+                keys.append(hashlib.sha256(f"{heading}|{line.strip()}".encode()).hexdigest()[:16])
+    return keys
+
+
+def _watch_events(project: Path, runtime: dict) -> tuple[list[str], list[str], list[str]]:
+    """New wake events as (messages, inbox ids, answer keys): escalations not handled or announced, an owner answer not seen before."""
     handled, announced = _read(project / ".ai" / "STATE.md"), runtime.get("announced", [])
     ids = [f.stem for f in sorted((project / ".ai" / "inbox").glob("*.md")) if f.stem not in handled and f.stem not in announced]
     msgs = [f"WATCHDOG: new escalation .ai/inbox/{i}.md" for i in ids]
-    seen = runtime.get("question_seen_at", 0)
-    fresh = [f for f in _question_files(project) if f.stat().st_mtime > seen and ANSWER_RE.search(_read(f))]
+    # Keyed by answer text, not mtime: the PM editing QUESTION.md must not re-wake it for an answer it already got (live).
+    fresh = [k for k in _answers(project) if k not in runtime.get("answers_seen", [])]
     if fresh:
         msgs.append("WATCHDOG: owner answered QUESTION.md")
-    return msgs, ids, max([f.stat().st_mtime for f in fresh], default=seen)
+    return msgs, ids, fresh
 
 
 def watch_once(project: Path, stale_minutes: float = STALE_MINUTES, now: float | None = None) -> dict:
@@ -535,7 +548,7 @@ def watch_once(project: Path, stale_minutes: float = STALE_MINUTES, now: float |
     open_tasks = [t for t in tasks if _active(t)]
     runtime_file = project / ".ai" / "RUNTIME.json"
     runtime = read_json(runtime_file, default={"schema_version": 2, "terminals": {}})
-    events, new_ids, question_at = _watch_events(project, runtime)
+    events, new_ids, new_answers = _watch_events(project, runtime)
     stale = [t["id"] for t in open_tasks if "stale" in t["flags"]]
     if not events:  # only the stale wake needs open tasks, and it is throttled
         if not open_tasks:
@@ -573,7 +586,7 @@ def watch_once(project: Path, stale_minutes: float = STALE_MINUTES, now: float |
     runtime["watch_woke_at"] = now
     runtime["watch_last_wake"] = {"at": now, "reason": events[0] if len(events) == 1 else "; ".join(events) if events else "stale or idle tasks"}
     runtime["announced"] = [*runtime.get("announced", []), *new_ids]
-    runtime["question_seen_at"] = question_at
+    runtime["answers_seen"] = [*runtime.get("answers_seen", []), *new_answers]
     write_json(runtime_file, runtime)
     return {"action": "woke_pm", "pm": pm, "stale": stale, "events": events}
 

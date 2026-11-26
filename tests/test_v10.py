@@ -116,7 +116,7 @@ class EventWakeTest(TaskMixin, Fixture):
         self.assertEqual((result["action"], sent), ("send_skipped", []))
         self.assertEqual(self.watch(None)[0]["action"], "woke_pm")
 
-    def test_question_answer_wakes_once_until_modified(self):
+    def test_question_answer_wakes_once_per_answer(self):
         q = self.project / "QUESTION.md"
         q.write_text("# Q\n\n## Use Postgres?\nOptions: A, B\nAnswer:\n", encoding="utf-8")
         self.assertEqual(self.watch(None)[0]["action"], "none")  # unanswered
@@ -125,8 +125,10 @@ class EventWakeTest(TaskMixin, Fixture):
         self.assertEqual(result["action"], "woke_pm")
         self.assertIn("WATCHDOG: owner answered QUESTION.md", sent[0][3])
         self.assertEqual(self.watch(None)[0]["action"], "none")
-        q.write_text("# Q\n\n## Use Postgres?\nAnswered: B\n", encoding="utf-8")  # PM marks it handled
+        q.write_text("# Q\n\n## Use Postgres?\nOptions: A, B\nAnswer: B\n\nResolved: merged.\n", encoding="utf-8")  # PM edits, keeps Answer:
         self.assertEqual(self.watch(None)[0]["action"], "none")
+        q.write_text("# Q\n\n## Use Postgres?\nAnswered: B\n\n## Ship it?\nAnswer: B\n", encoding="utf-8")  # same text, new question
+        self.assertEqual(self.watch(None)[0]["action"], "woke_pm")
 
     def test_event_wake_carries_warnings(self):
         self.task("a", worker="w1", paths="src")
