@@ -144,6 +144,9 @@ class TempOrgTest(unittest.TestCase):
              patch("agentorg.runtime.existing_terminal", side_effect=active), \
              patch("agentorg.runtime.run_process", side_effect=capture_run):
             first = runtime.start_team(self.project, apply=True)
+            # live: a running worker switched branches in its own worktree; reusing its terminal must not abort team up
+            worker = next(r for r in config.load_project(self.project)["roles"] if r["mode"] == "worker")
+            subprocess.run(["git", "checkout", "-q", "-b", "team/own-branch"], cwd=runtime.worktree_info(self.project, worker)[0], check=True)
             second = runtime.start_team(self.project, apply=True)
         self.assertEqual([x["action"] for x in first], ["launched"] * 4)
         self.assertEqual([x["action"] for x in second], ["reused"] * 4)
