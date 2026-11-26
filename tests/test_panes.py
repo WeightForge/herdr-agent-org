@@ -37,7 +37,7 @@ class FakeHerdr:
         return ok("{}")
 
     def mutations(self):
-        return [c for c in self.calls if c[0] == "do"]
+        return [c for c in self.calls if c[0] == "do" and c[1] != "pane.rename"]  # cosmetic renames are covered in test_v11
 
 
 @patch("agentorg.runtime.time.sleep", lambda s: None)

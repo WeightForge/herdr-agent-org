@@ -39,6 +39,7 @@ One giant PM prompt that dispatches, polls, relays review comments and remembers
 
 - Mix harnesses in one team: a Claude Code PM, an Antigravity reviewer and a Codex worker can share one repo, each on its own account, model and effort.
 - One-question setup: the PM reads your repo and proposes a team with real job titles, accounts, models and effort; one "yes" starts it.
+- Per-role skill sets: the PM lists the skills actually installed for each role's account (`agentorg profile skills`), proposes 2-4 per role in the team table, and the role's launch prompt names them. Skills are advice: a missing one only warns, and nothing is ever installed.
 - Full autonomy: agents work without permission prompts inside the project, park owner decisions in `QUESTION.md` and keep going; `team watch` wakes the PM when work stalls, when a new escalation lands in the inbox, and when you answer in `QUESTION.md`.
 - `agentorg resume`: after a restart every agent comes back in its own Herdr pane with its own conversation.
 - Dry-run by default; nothing starts without `team up --apply`.
@@ -100,10 +101,10 @@ The PM reads your repo, detects the accounts you are logged in with (it only che
 Accounts found: claude (Claude Code), claude-work (Claude Code), codex (Codex)
 
 Proposed team
-| Title               | Level    | Account     | Model        | Effort | Focus                                            |
-|---------------------|----------|-------------|--------------|--------|--------------------------------------------------|
-| Senior AI Scientist | reviewer | claude-work | opus         | high   | Evaluation design, data leakage, metric validity |
-| Senior AI Engineer  | worker   | codex       | gpt-6.2-sol  | medium | Training and serving pipelines, tests            |
+| Title               | Level    | Account     | Model        | Effort | Skills                       | Focus                                            |
+|---------------------|----------|-------------|--------------|--------|------------------------------|--------------------------------------------------|
+| Senior AI Scientist | reviewer | claude-work | opus         | high   | code-review, scrutinize      | Evaluation design, data leakage, metric validity |
+| Senior AI Engineer  | worker   | codex       | gpt-6.2-sol  | medium | tdd, diagnosing-bugs         | Training and serving pipelines, tests            |
 
 Settings (reply to change): autonomy full; merge, release and deploy need your approval.
 
@@ -113,7 +114,7 @@ ROADMAP.md will start with a reproducible baseline, then the evaluation harness.
 Start this team, or tell me what to change?
 ```
 
-The PM picks each model and effort from what that account's CLI offers: a stronger model for reviewers and hard research roles, a cheaper one for routine workers.
+The PM picks each model and effort from what that account's CLI offers: a stronger model for reviewers and hard research roles, a cheaper one for routine workers. It picks skills only from `agentorg profile skills <accounts> --json`, which lists the skills installed for those accounts (name, one-line description, source); a useful skill that is not installed is mentioned as a suggestion, never installed for you.
 
 After one "yes" the PM registers the accounts, shapes `.ai/TEAM.json`, writes `PROJECT.md` and `ROADMAP.md`, runs `doctor` and `team plan`, commits `.ai/`, runs `team up --apply` and reports the panes. That "yes" approves launching this team only; merge, release, deploy and spend still need your own message.
 
@@ -124,7 +125,7 @@ pip install herdr-agent-org
 agentorg install --target both        # skills for Claude Code and Codex (also: claude | codex | antigravity | all)
 ```
 
-Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v1.0.1 agentorg`.
+Without a pip install, prefix any command with `uvx --from git+https://github.com/WeightForge/herdr-agent-org@v1.1.0 agentorg`.
 
 Profiles are local aliases: an executable, an optional config directory (`--config-dir`, e.g. a separate `CLAUDE_CONFIG_DIR`) and a public model/effort. No key is stored. The CLI must already be installed and logged in.
 
@@ -213,7 +214,7 @@ flowchart TD
 ```
 
 - `team up --apply` starts reviewers as children of the PM terminal and each worker with `--parent <its reviewer>`, so Herdr reports worker events (turn ended, blocked, exited) to the reviewer, and only reviewer escalations reach the PM.
-- From a Herdr App terminal, `team up --apply` also shows each role as a pane in the PM's tab: PM on the left, one row per reviewer with its workers to the right (`--no-panes` to skip).
+- From a Herdr App terminal, `team up --apply` also shows each role as a pane in the PM's tab: PM on the left, one row per reviewer with its workers to the right, each pane named `<Title> \· <provider>` (`--no-panes` to skip).
 - Messages only point at files. A lost message loses nothing; the file is the record.
 - The PM reads `.ai/inbox/*.md` whenever it wakes. If the PM is outside Herdr, nothing is pushed and the inbox is the channel.
 - The full rules (file layout, states, escalation codes) are in [`PROTOCOL.md`](https://github.com/WeightForge/herdr-agent-org/blob/main/src/agentorg/data/PROTOCOL.md), copied to `.ai/PROTOCOL.md` in your project.
@@ -257,10 +258,11 @@ Task `T-1`: add a CSV export. One owner, one reviewer, one worker.
 | `agentorg init [--template engineering\|research\|content] [--name N]` | Create missing `.ai/` files and `.ai/PROTOCOL.md`; never overwrites |
 | `agentorg profile add NAME --provider claude\|codex\|antigravity [--config-dir D] [--model M] [--effort E] [--native-profile P] [--command EXE] [--replace]` | Save a local profile alias (no secrets) |
 | `agentorg profile list \| remove NAME` | Inspect or delete aliases |
+| `agentorg profile skills [NAME...] [--json]` | List skills installed for profiles (default: all): name, one-line description, source. Reads only skill folder names and SKILL.md `name`/`description`; plugin skills are named `plugin:skill` for Claude |
 | `agentorg profile detect [--add]` | Find Claude/Codex config dirs and `agy` by existence checks only; `--add` registers new ones (default `~/.claude` and `~/.codex` are stored as `config_dir: null`) |
 | `agentorg role add ROLE --mode reviewer\|worker --title T --focus F --profile P [--reviewer-role R] [--model M] [--effort E]` | Add a role with a real job title; `mode` is only its level (validated before write) |
 | `agentorg role remove ROLE` | Remove a role; refused while an enabled worker routes to it |
-| `agentorg role set ROLE [--title T] [--focus F] [--profile P] [--model M] [--effort E] [--reviewer-role R] [--enable\|--disable]` | Edit the team manifest (validated before write) |
+| `agentorg role set ROLE [--title T] [--focus F] [--profile P] [--model M] [--effort E] [--skills a,b] [--reviewer-role R] [--enable\|--disable]` | Edit the team manifest (validated before write) |
 | `agentorg role list` | Show roles |
 | `agentorg doctor` | Check Python, `hc`, `git`, provider CLIs and profile directories; no API calls |
 | `agentorg team plan` | Dry run: exact launch argv and worktree paths |

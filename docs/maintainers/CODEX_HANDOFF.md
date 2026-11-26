@@ -1,4 +1,4 @@
-# Maintainer handoff (1.0.1)
+# Maintainer handoff (1.1.0)
 
 Short orientation for the next maintainer or coding agent. Read `README.md`, `docs/ARCHITECTURE.md`, `SECURITY.md` and `AGENTS.md` first.
 
