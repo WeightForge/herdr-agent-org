@@ -15,13 +15,17 @@ Start the team, go to sleep, and come back to finished work, a short list of que
 
 [Quickstart](#quickstart) · [Full autonomy](#full-autonomy) · [Resume](#after-a-restart-agentorg-resume) · [How it works](#how-it-works) · [Docs](#docs)
 
+<img src="https://raw.githubusercontent.com/WeightForge/herdr-agent-org/main/assets/demo.gif" alt="Demo: a Claude Code PM sets up a team, a Codex worker implements, an Antigravity reviewer verifies, the owner answers in QUESTION.md, and after every terminal is removed agentorg resume brings each agent back to its own conversation" width="100%">
+
+<sub>Recorded live, sped up: Claude Code PM (Haiku 5.5), Antigravity reviewer (Gemini 4 Hydrogen), Codex worker (GPT-6-Luna), on a sample repo.</sub>
+
 </div>
 
 ---
 
 `agentorg`, the CLI of herdr-agent-org, is a small, dependency-free Python tool plus four agent skills. It starts a **PM → reviewer → worker** team of Claude Code, Codex or Antigravity sessions on Herdr App and its `hc` CLI, gives each software worker its own Git worktree, and keeps all coordination in plain files under `.ai/`.
 
-> Status: pre-1.0. Unit tests mock `hc` and the providers; each release is also run live on Herdr with real agents (see the [changelog](https://github.com/WeightForge/herdr-agent-org/blob/main/CHANGELOG.md) for what was verified and what was not). Treat it as a careful beta and read [Safety](#safety-model) first.
+> Status: 1.0. Unit tests mock `hc` and the providers; each release is also run live on Herdr with real agents (see the [changelog](https://github.com/WeightForge/herdr-agent-org/blob/main/CHANGELOG.md) for what was verified and what was not). Read [Safety](#safety-model) before turning on full autonomy.
 
 ## Why
 
@@ -33,6 +37,7 @@ One giant PM prompt that dispatches, polls, relays review comments and remembers
 
 ## Features
 
+- Mix harnesses in one team: a Claude Code PM, an Antigravity reviewer and a Codex worker can share one repo, each on its own account, model and effort.
 - One-question setup: the PM reads your repo and proposes a team with real job titles, accounts, models and effort; one "yes" starts it.
 - Full autonomy: agents work without permission prompts inside the project, park owner decisions in `QUESTION.md` and keep going; `team watch` wakes the PM when work stalls, when a new escalation lands in the inbox, and when you answer in `QUESTION.md`.
 - `agentorg resume`: after a restart every agent comes back in its own Herdr pane with its own conversation.
