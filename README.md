@@ -15,9 +15,9 @@ Start the team, go to sleep, and come back to finished work, a short list of que
 
 [Quickstart](#quickstart) · [Full autonomy](#full-autonomy) · [Resume](#after-a-restart-agentorg-resume) · [How it works](#how-it-works) · [Docs](#docs)
 
-<img src="https://raw.githubusercontent.com/WeightForge/herdr-agent-org/main/assets/demo.gif" alt="Demo: a Claude Code PM sets up a team, a Codex worker implements, an Antigravity reviewer verifies, the owner answers in QUESTION.md, and after every terminal is removed agentorg resume brings each agent back to its own conversation" width="100%">
+<img src="https://raw.githubusercontent.com/WeightForge/herdr-agent-org/main/assets/demo.gif" alt="Demo: a Claude Code PM checks installed skills, designs a 9-agent engineering org with job titles, harness, model, effort and skills per role, launches it as 10 Herdr panes across Claude Code, Codex and Antigravity, and parks finished work for the owner's merge decision" width="100%">
 
-<sub>Recorded in Herdr App, cut to 28 s with captions and zooms: a Claude Code PM (Haiku 5.5), an Antigravity reviewer (Gemini 4 Hydrogen) and a Codex worker (GPT-6-Luna) on a sample repo. Local paths are blurred.</sub>
+<sub>Recorded in Herdr App, cut to 24 s with captions and zooms: a Claude Code PM (Haiku 5.5) runs three tech leads and six engineers on Claude Code, Codex (GPT-6-Luna) and Antigravity (Gemini 4 Hydrogen), all on small models, on a sample repo.</sub>
 
 </div>
 
